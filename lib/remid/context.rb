@@ -1,7 +1,7 @@
 module Remid
   class Context
     COL = 10
-    attr_reader :opts, :meta, :objectives, :scheduler, :functions, :blobs, :jsons, :parser
+    attr_reader :opts, :meta, :objectives, :scheduler, :functions, :blobs, :jsons, :parser, :on_load, :on_tick
     attr_accessor :function_namespace, :scoreboard_namespace, :relative_target
 
     def initialize
@@ -15,6 +15,32 @@ module Remid
       @meta = OpenStruct.new(version: 10, description: "An undescribed datapack by an unknown author")
       @scheduler = FunctionScheduler.new(self)
       @objectives = ObjectiveManager.new(self)
+      @on_load = [:__remid_auto]
+      @on_tick = [:__remid_auto]
+    end
+
+    def on_load= value
+      if value
+        if value.is_a?(Array)
+          @on_load = value
+        else
+          @on_load = [value]
+        end
+      else
+        @on_load = []
+      end
+    end
+
+    def on_tick= value
+      if value
+        if value.is_a?(Array)
+          @on_tick = value
+        else
+          @on_tick = [value]
+        end
+      else
+        @on_tick = []
+      end
     end
 
     def __remid_load_manifest file
@@ -50,22 +76,60 @@ module Remid
 
       if @opts.mcmeta
         fcount += 1
-        size += yield(:json, Pathname.new("pack.mcmeta"), { pack: @meta.to_h }).size
+        size += yield(:json, Pathname.new("pack.mcmeta"), { pack: @meta.to_h }, []).size
+      end
+
+      if @on_load.any?
+        fwarns = []
+        if @on_load[0] == :__remid_auto
+          @on_load.shift
+          @on_load.unshift("load") if @functions["load"]
+        end
+
+        scoped_on_load = @on_load.map do |lfunc|
+          lfunc = "#{@function_namespace}:#{lfunc}" unless lfunc[FunctionParser::T_NSSEP]
+          if lfunc.start_with?("#{@function_namespace}:") && !@functions[lfunc.split(":")[1]]
+            fwarns << "calling undefined function `#{lfunc}' in $remid.on_load"
+          end
+          lfunc
+        end
+
+        fcount += 1
+        size += yield(:json, Pathname.new("minecraft/tags/functions/load.json"), { values: scoped_on_load }, fwarns).size
+      end
+
+      if @on_tick.any?
+        fwarns = []
+        if @on_tick[0] == :__remid_auto
+          @on_tick.shift
+          @on_tick.unshift("tick") if @functions["tick"]
+        end
+
+        scoped_on_tick = @on_tick.map do |lfunc|
+          lfunc = "#{@function_namespace}:#{lfunc}" unless lfunc[FunctionParser::T_NSSEP]
+          if lfunc.start_with?("#{@function_namespace}:") && !@functions[lfunc.split(":")[1]]
+            fwarns << "calling undefined function `#{lfunc}' in $remid.on_tick"
+          end
+          lfunc
+        end
+
+        fcount += 1
+        size += yield(:json, Pathname.new("minecraft/tags/functions/tick.json"), { values: scoped_on_tick }, fwarns).size
       end
 
       @jsons.each do |rel_file, data|
         fcount += 1
-        size += yield(:json, data_path.join(rel_file), data).size
+        size += yield(:json, data_path.join(rel_file), data, []).size
       end
 
       @functions.each do |rel_file, data|
         fcount += 1
-        size += yield(:function, data_path.join(@function_namespace, "functions", Pathname.new("#{rel_file}.mcfunction")), data).size
+        size += yield(:function, data_path.join(@function_namespace, "functions", Pathname.new("#{rel_file}.mcfunction")), data, data.warnings).size
       end
 
       @blobs.each do |rel_file, file|
         fcount += 1
-        size += yield(:blob, data_path.join(rel_file), file).size
+        size += yield(:blob, data_path.join(rel_file), file, []).size
       end
       [fcount, size]
     end

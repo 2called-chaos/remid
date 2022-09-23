@@ -98,7 +98,7 @@ module Remid
     end
 
     def serialize_context ctx
-      ctx.__remid_serialize do |type, rel_file, file_or_data|
+      ctx.__remid_serialize do |type, rel_file, file_or_data, warnings|
         FileUtils.mkdir_p(@d_bld.join(rel_file.dirname))
         case type
         when :blob
@@ -107,10 +107,13 @@ module Remid
         when :json
           File.open(@d_bld.join(rel_file), "wb") {|f| f.write(ctx.opts.pretty_json ? JSON.pretty_generate(file_or_data) : JSON.generate(file_or_data)) }
           puts col("*", :silver) + "./" + rel_file.to_s
+          warnings.each do |warning|
+            warn col("") + "  ! ".red + warning.red
+          end
         when :function
           file_or_data.result_buffer # pre-parse for warnings
           puts col(file_or_data.warnings.empty? ? "#" : "WARN #", file_or_data.warnings.empty? ? :green : :yellow) + "./" + rel_file.to_s
-          file_or_data.warnings.each do |warning|
+          warnings.each do |warning|
             warn col("") + "  ! ".red + warning.red
           end
           File.open(@d_bld.join(rel_file), "wb") {|f| f.write(file_or_data.as_string) }
