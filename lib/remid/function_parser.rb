@@ -62,9 +62,9 @@ module Remid
 
     def parse
       raise "concurrent parse error" if Thread.current[:fparse_rbuf]
+      cbuf = []
       [].tap do |rbuf|
         buf = payload.split("\n", -1)
-        cbuf = []
         wbuf = warnings
         li_no = @li_offset
         state = {}
@@ -103,14 +103,14 @@ module Remid
           if state[:block_indent] != 0
             if line.peek(T_BLOCK_OPEN.length) == T_BLOCK_OPEN
               state[:block_indent] += 1
-              cbuf << raw_line
+              state[:block_buffer] << raw_line
               next
             elsif line.peek(T_BLOCK_CLOSE.length) == T_BLOCK_CLOSE && state[:block_indent] > 1
               state[:block_indent] -= 1
-              cbuf << raw_line
+              state[:block_buffer] << raw_line
               next
             elsif !(line.peek(T_BLOCK_CLOSE.length) == T_BLOCK_CLOSE)
-              cbuf << raw_line
+              state[:block_buffer] << raw_line
               next
             end
           end
@@ -144,15 +144,15 @@ module Remid
             line.read_while(SPACES) # padding
             # collect till end, evaluate and add to rbuf
             state[:block_indent] += 1
-            #puts "open #{state[:block_indent]}"
+            puts "open #{state[:block_indent]}"
             if state[:block_indent] == 1
               state[:block_header] = line.read
               rbuf << cbuf.shift while cbuf.length > 0
-              Thread.current[:fparse_cbuf] = cbuf = state[:block_buffer]
+              #Thread.current[:fparse_cbuf] = cbuf = state[:block_buffer]
             end
           elsif line.readif(T_BLOCK_CLOSE)
             line.read_while(SPACES) # padding
-            #puts "close #{state[:block_indent]}"
+            puts "close #{state[:block_indent]}"
             # marks block end
             state[:block_indent] -= 1
 
@@ -160,38 +160,56 @@ module Remid
               state[:block_footer] = line.read
 
               proc do
-                a_binding = @a_binding.clone
+                a_binding = binding.clone
                 a_binding.local_variable_set(:a_context, @context)
                 a_binding.local_variable_set(:a_src, @src)
-                a_binding.local_variable_set(:a_buffer, state[:block_buffer].dup)
+                a_binding.local_variable_set(:a_buffer, state[:block_buffer].dup.freeze)
                 a_binding.local_variable_set(:a_li_offset, li_no - state[:block_buffer].length - 1) # -1 because header
                 a_binding.local_variable_set(:a_skip_indent, @skip_indent + 1)
                 state[:block_buffer].clear
 
                 to_eval = []
-                to_eval << %q{thr = Thread.new do}
-                to_eval <<  %{  #{state.delete(:block_header)}}
+                to_eval <<  %{#{state.delete(:block_header)}}
+                to_eval << %q{  puts "li:#{a_skip_indent}"}
+                to_eval << %q{  puts "x:#{x rescue ??}"}
+                to_eval << %q{  puts "y:#{y rescue ??}"}
+                to_eval << %q{  parent_thread = Thread.current}
+                to_eval << %q{  thr = Thread.new do}
                 to_eval << %q{    fp = FunctionParser.new(a_context, a_buffer.join("\n"), a_src, binding, skip_indent: a_skip_indent, li_offset: a_li_offset)}
-                to_eval << %q{    Thread.main[:fparse_cbuf] = Thread.main[:fparse_cbuf].concat fp.result_buffer}
-                to_eval << %q{    Thread.main[:fparse_wbuf] = Thread.main[:fparse_wbuf].concat fp.warnings}
-                to_eval <<  %{  #{state.delete(:block_footer)}}
-                to_eval << %q{end.join}
+                to_eval << %q{    puts ">----------------------"}
+                to_eval << %q{    puts a_buffer.inspect}
+                to_eval << %q{    puts "=---------------------"}
+                to_eval << %q{    puts fp.result_buffer.inspect}
+                to_eval << %q{    puts "<---------------------"}
+                to_eval << %q{    puts }
+                to_eval << %q{    puts }
+                to_eval << %q{    puts parent_thread[:fparse_cbuf].inspect }
+                to_eval << %q{    puts }
+                to_eval << %q{    parent_thread[:fparse_cbuf] = parent_thread[:fparse_cbuf].concat fp.result_buffer.dup}
+                to_eval << %q{    puts parent_thread[:fparse_cbuf].inspect }
+                #to_eval << %q{    Thread.main[:fparse_wbuf] = Thread.main[:fparse_wbuf].concat fp.warnings}
+                to_eval << %q{  end.join}
+                to_eval <<  %{#{state.delete(:block_footer)}}
                 #to_eval << %{rbuf << cbuf.shift while cbuf.length > 0}
                 #to_eval << %{Thread.current[:fparse_cbuf] = cbuf = []}
-
+                puts nil, nil, to_eval, nil, nil
                 # waitlock = Queue.new
                 # thr = Thread.new do
                 #   waitlock.pop
-                  eval(to_eval.join("\n"), a_binding)
+                #binding.pry
+                  eval(to_eval.join("\n"), a_binding) #if @li_offset == 0
                 # end
+                #binding.pry
                 #thr[:block_buffer] = state[:block_buffer].dup
                 #thr[:skip_indent] = @skip_indent + 1
                 # waitlock << true
                 # thr.join
 
+                #binding.pry
+
                 rbuf << cbuf.shift while cbuf.length > 0
                 #rbuf << state[:block_buffer] while state[:block_buffer].length > 0
-                Thread.current[:fparse_cbuf] = cbuf = []
+                #Thread.current[:fparse_cbuf] = cbuf = []
               end.call
             end
           elsif line.peek(1) == T_COMMENT
@@ -267,8 +285,10 @@ module Remid
           # @todo check for unreferenced functions
         end
         rbuf << cbuf.shift while cbuf.length > 0
-        Thread.current[:fparse_rbuf] = nil
-        Thread.current[:fparse_cbuf] = nil
+        if Thread.current == Thread.main
+          Thread.current[:fparse_rbuf] = nil
+          Thread.current[:fparse_cbuf] = nil
+        end
       end
     end
 
