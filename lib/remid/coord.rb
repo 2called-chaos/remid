@@ -10,11 +10,23 @@ module Remid
       [x, y, z].join(" ")
     end
 
+    def dupe
+      Coord.new(x, y, z)
+    end
+
     def move(*args, **kw)
-      self.dx += kw[:x] || args[0]
-      self.dy += kw[:y] || args[1]
-      self.dz += kw[:z] || args[2]
+      self.x += kw[:x] || args[0] || 0
+      self.y += kw[:y] || args[1] || 0
+      self.z += kw[:z] || args[2] || 0
       self
+    end
+
+    def rel(*args, **kw)
+      copy = dupe
+      copy.x += kw[:x] || args[0] || 0
+      copy.y += kw[:y] || args[1] || 0
+      copy.z += kw[:z] || args[2] || 0
+      copy
     end
   end
 end
