@@ -137,6 +137,7 @@ module Remid
     def function_namespace= value
       @function_namespace = value.presence
       @scheduler.namespace = @function_namespace
+      self.scoreboard_namespace = value unless @scoreboard_namespace
     end
 
     def scoreboard_namespace= value
