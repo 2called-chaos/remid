@@ -79,12 +79,12 @@ module Remid
         size += yield(:json, Pathname.new("pack.mcmeta"), { pack: @meta.to_h }, []).size
       end
 
+      if @on_load[0] == :__remid_auto
+        @on_load.shift
+        @on_load.unshift("load") if @functions["load"]
+      end
       if @on_load.any?
         fwarns = []
-        if @on_load[0] == :__remid_auto
-          @on_load.shift
-          @on_load.unshift("load") if @functions["load"]
-        end
 
         scoped_on_load = @on_load.map do |lfunc|
           lfunc = "#{@function_namespace}:#{lfunc}" unless lfunc[FunctionParser::T_NSSEP]
@@ -95,15 +95,15 @@ module Remid
         end
 
         fcount += 1
-        size += yield(:json, Pathname.new("minecraft/tags/functions/load.json"), { values: scoped_on_load }, fwarns).size
+        size += yield(:json, Pathname.new("data/minecraft/tags/functions/load.json"), { values: scoped_on_load }, fwarns).size
       end
 
+      if @on_tick[0] == :__remid_auto
+        @on_tick.shift
+        @on_tick.unshift("tick") if @functions["tick"]
+      end
       if @on_tick.any?
         fwarns = []
-        if @on_tick[0] == :__remid_auto
-          @on_tick.shift
-          @on_tick.unshift("tick") if @functions["tick"]
-        end
 
         scoped_on_tick = @on_tick.map do |lfunc|
           lfunc = "#{@function_namespace}:#{lfunc}" unless lfunc[FunctionParser::T_NSSEP]
@@ -114,7 +114,7 @@ module Remid
         end
 
         fcount += 1
-        size += yield(:json, Pathname.new("minecraft/tags/functions/tick.json"), { values: scoped_on_tick }, fwarns).size
+        size += yield(:json, Pathname.new("data/minecraft/tags/functions/tick.json"), { values: scoped_on_tick }, fwarns).size
       end
 
       @jsons.each do |rel_file, data|
