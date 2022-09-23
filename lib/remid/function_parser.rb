@@ -27,7 +27,7 @@ module Remid
   end
 
   class FunctionParser
-    attr_reader :warnings, :payload
+    attr_reader :warnings, :payload, :context
 
     SPACES = [" ", "\t"].freeze
     ENCLOSERS = ["[", "]", "{", "}"].freeze
@@ -62,6 +62,12 @@ module Remid
 
     def get_binding
       binding
+    end
+
+    [:capture].each do |meth|
+      define_method(meth) do |*a, **kw, &b|
+        context.send(meth, *a, **kw, &b)
+      end
     end
 
     def parse
@@ -148,7 +154,7 @@ module Remid
             line.read_while(SPACES) # padding
             # collect till end, evaluate and add to rbuf
             state[:block_indent] += 1
-            puts "open #{state[:block_indent]}"
+            #puts "open #{state[:block_indent]}"
             if state[:block_indent] == 1
               state[:block_header] = line.read
               rbuf << cbuf.shift while cbuf.length > 0
@@ -156,7 +162,7 @@ module Remid
             end
           elsif line.readif(T_BLOCK_CLOSE)
             line.read_while(SPACES) # padding
-            puts "close #{state[:block_indent]}"
+            #puts "close #{state[:block_indent]}"
             # marks block end
             state[:block_indent] -= 1
 
@@ -175,9 +181,9 @@ module Remid
 
                 to_eval = []
                 to_eval <<  %{#{state.delete(:block_header)}}
-                to_eval << %q{  puts "li:#{a_skip_indent}"}
-                to_eval << %q{  puts "x:#{x rescue ??}"}
-                to_eval << %q{  puts "y:#{y rescue ??}"}
+                #to_eval << %q{  puts "li:#{a_skip_indent}"}
+                #to_eval << %q{  puts "x:#{x rescue ??}"}
+                #to_eval << %q{  puts "y:#{y rescue ??}"}
                 to_eval << %q{  s_binding = binding}
                 to_eval << %q{  if x_binding}
                 to_eval << %q{    (x_binding.local_variables - s_binding.local_variables).each do |x|}
@@ -185,25 +191,27 @@ module Remid
                 to_eval << %q{    end}
                 to_eval << %q{  end}
                 to_eval << %q{  parent_thread = Thread.current}
+                #to_eval << %q{  parent_thread = Thread.main unless parent_thread[:fparse_cbuf]}
                 to_eval << %q{  thr = Thread.new do}
                 to_eval << %q{    fp = FunctionParser.new(a_context, a_buffer.join("\n"), a_src, s_binding, skip_indent: a_skip_indent, li_offset: a_li_offset)}
-                to_eval << %q{    puts ">----------------------"}
-                to_eval << %q{    puts a_buffer.inspect}
+                #to_eval << %q{    puts ">----------------------"}
+                #to_eval << %q{    puts a_buffer.inspect}
                 to_eval << %q{    puts "=---------------------"}
                 to_eval << %q{    puts fp.result_buffer.inspect}
                 to_eval << %q{    puts "<---------------------"}
-                to_eval << %q{    puts }
-                to_eval << %q{    puts }
+                #to_eval << %q{    puts }
+                #to_eval << %q{    puts }
+                to_eval << %q{    puts parent_thread == Thread.main }
                 to_eval << %q{    puts parent_thread[:fparse_cbuf].inspect }
-                to_eval << %q{    puts }
+                #to_eval << %q{    puts }
                 to_eval << %q{    parent_thread[:fparse_cbuf] = parent_thread[:fparse_cbuf].concat fp.result_buffer.dup}
-                to_eval << %q{    puts parent_thread[:fparse_cbuf].inspect }
-                to_eval << %q{    parent_thread[:fparse_wbuf] = Thread.main[:fparse_wbuf].concat fp.warnings}
+                #to_eval << %q{    puts parent_thread[:fparse_cbuf].inspect }
+                to_eval << %q{    parent_thread[:fparse_wbuf] = parent_thread[:fparse_wbuf].concat fp.warnings}
                 to_eval << %q{  end.join}
                 to_eval <<  %{#{state.delete(:block_footer)}}
                 #to_eval << %{rbuf << cbuf.shift while cbuf.length > 0}
                 #to_eval << %{Thread.current[:fparse_cbuf] = cbuf = []}
-                puts nil, nil, to_eval, nil, nil
+                #puts nil, nil, to_eval, nil, nil
                 # waitlock = Queue.new
                 # thr = Thread.new do
                 #   waitlock.pop

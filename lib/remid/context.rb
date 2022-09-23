@@ -110,9 +110,9 @@ module Remid
 
     def capture &block
       proc do |*args|
-        Thread.new do
+        #Thread.new do
           block.call(*args)
-        end.join
+        #end.join
       end
     end
   end
