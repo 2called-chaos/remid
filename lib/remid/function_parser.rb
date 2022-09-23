@@ -363,7 +363,11 @@ module Remid
       if str.start_with?("/")
         str[1..-1]
       else
-        "#{@context.scoreboard_namespace}_#{str}"
+        scoped_key = "#{@context.scoreboard_namespace}_#{str}"
+        unless @context.objectives[scoped_key]
+          @warnings << "referencing undefined scoreboard objective `#{scoped_key}' in #{@rsrc}:#{@li_no}"
+        end
+        scoped_key
       end
     end
 
