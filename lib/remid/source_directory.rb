@@ -37,7 +37,7 @@ module Remid
     end
 
     def ensure_source
-      if !@dir.exist?
+      if !@d_src.exist?
         warn col("ERROR", :red) + "the target directory is missing the data folder './#{@src}'".red
         return
       end
