@@ -27,7 +27,7 @@ module Remid
       _fnc = fnc.to_s
       raise "duplicate function error #{_fnc}" if @functions[_fnc]
       raise "expected string, got #{payload.class}" unless payload.is_a?(String)
-      @functions[_fnc] = FunctionParser.new(self, payload, src, get_binding)
+      @functions[_fnc] = FunctionParser.new(self, payload, src)
     end
 
     def get_binding

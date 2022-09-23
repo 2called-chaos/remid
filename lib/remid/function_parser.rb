@@ -45,10 +45,10 @@ module Remid
     T_SLASH = "/".freeze
     T_NSSEP = ":".freeze
 
-    def initialize context, payload, src, a_binding, skip_indent: 0, li_offset: 0
+    def initialize context, payload, src, a_binding = nil, skip_indent: 0, li_offset: 0
       @context = context
       @payload = payload
-      @a_binding = a_binding
+      @a_binding = a_binding # || get_binding
       @src = @rsrc = src
       rt = @context.relative_target&.to_s
       if rt && @src.to_s.start_with?(rt)
@@ -58,6 +58,10 @@ module Remid
       @indent_per_level = 1
       @skip_indent = skip_indent
       @li_offset = li_offset
+    end
+
+    def get_binding
+      binding
     end
 
     def parse
@@ -160,12 +164,13 @@ module Remid
               state[:block_footer] = line.read
 
               proc do
-                a_binding = binding.clone
+                a_binding = binding
                 a_binding.local_variable_set(:a_context, @context)
                 a_binding.local_variable_set(:a_src, @src)
                 a_binding.local_variable_set(:a_buffer, state[:block_buffer].dup.freeze)
                 a_binding.local_variable_set(:a_li_offset, li_no - state[:block_buffer].length - 1) # -1 because header
                 a_binding.local_variable_set(:a_skip_indent, @skip_indent + 1)
+                a_binding.local_variable_set(:x_binding, @a_binding)
                 state[:block_buffer].clear
 
                 to_eval = []
@@ -173,9 +178,15 @@ module Remid
                 to_eval << %q{  puts "li:#{a_skip_indent}"}
                 to_eval << %q{  puts "x:#{x rescue ??}"}
                 to_eval << %q{  puts "y:#{y rescue ??}"}
+                to_eval << %q{  s_binding = binding}
+                to_eval << %q{  if x_binding}
+                to_eval << %q{    (x_binding.local_variables - s_binding.local_variables).each do |x|}
+                to_eval << %q{      s_binding.local_variable_set(x, x_binding.local_variable_get(x))}
+                to_eval << %q{    end}
+                to_eval << %q{  end}
                 to_eval << %q{  parent_thread = Thread.current}
                 to_eval << %q{  thr = Thread.new do}
-                to_eval << %q{    fp = FunctionParser.new(a_context, a_buffer.join("\n"), a_src, binding, skip_indent: a_skip_indent, li_offset: a_li_offset)}
+                to_eval << %q{    fp = FunctionParser.new(a_context, a_buffer.join("\n"), a_src, s_binding, skip_indent: a_skip_indent, li_offset: a_li_offset)}
                 to_eval << %q{    puts ">----------------------"}
                 to_eval << %q{    puts a_buffer.inspect}
                 to_eval << %q{    puts "=---------------------"}
@@ -187,7 +198,7 @@ module Remid
                 to_eval << %q{    puts }
                 to_eval << %q{    parent_thread[:fparse_cbuf] = parent_thread[:fparse_cbuf].concat fp.result_buffer.dup}
                 to_eval << %q{    puts parent_thread[:fparse_cbuf].inspect }
-                #to_eval << %q{    Thread.main[:fparse_wbuf] = Thread.main[:fparse_wbuf].concat fp.warnings}
+                to_eval << %q{    parent_thread[:fparse_wbuf] = Thread.main[:fparse_wbuf].concat fp.warnings}
                 to_eval << %q{  end.join}
                 to_eval <<  %{#{state.delete(:block_footer)}}
                 #to_eval << %{rbuf << cbuf.shift while cbuf.length > 0}
@@ -207,7 +218,7 @@ module Remid
 
                 #binding.pry
 
-                rbuf << cbuf.shift while cbuf.length > 0
+                #rbuf << cbuf.shift while cbuf.length > 0
                 #rbuf << state[:block_buffer] while state[:block_buffer].length > 0
                 #Thread.current[:fparse_cbuf] = cbuf = []
               end.call
