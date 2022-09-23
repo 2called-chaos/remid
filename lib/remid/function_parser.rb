@@ -27,12 +27,14 @@ module Remid
   end
 
   class FunctionParser
-    attr_reader :warnings, :payload, :context
+    attr_reader :warnings, :payload, :context, :cbuf
 
     SPACES = [" ", "\t"].freeze
     ENCLOSERS = ["[", "]", "{", "}"].freeze
     T_SPACE = " ".freeze
     T_EVAL = "#~~".freeze
+    T_EVAL_BEGIN = "__BEGIN__".freeze
+    T_EVAL_END = "__END__".freeze
     T_EVAL_APPEND = "#~<".freeze
     T_BLOCK_OPEN = "#~[".freeze
     T_BLOCK_CLOSE = "#~]".freeze
@@ -83,8 +85,10 @@ module Remid
       @state[:indent] = 0
       @state[:scoped_indent] = 0
       @state[:block_buffer] = []
+      @state[:eval_block] = []
       @state[:block_header] = nil
       @state[:block_footer] = nil
+      @state[:in_eval_block] = false
 
       buf = payload.split("\n", -1)
 
@@ -101,6 +105,23 @@ module Remid
         # skip indent (subs)
         (@skip_indent * @indent_per_level).times do
           @line.readif(SPACES)
+        end
+
+        if @state[:in_eval_block]
+          if @line.peek == T_EVAL_END
+            @state[:in_eval_block] = false
+            obj = self.clone
+            obj.instance_variable_set(:"@__clone_parent", self)
+            def obj.out
+              @__clone_parent.cbuf
+            end
+            obj.instance_eval(@state[:eval_block].join("\n"))
+            puts @state[:eval_block]
+            @state[:eval_block].clear
+          else
+            @state[:eval_block] << @line.read
+          end
+          next
         end
 
         # indent
@@ -128,8 +149,9 @@ module Remid
         end
 
         if @line.peek.empty?
-          # empty @line
           @cbuf << @line.read
+        elsif @line.readif(T_EVAL_BEGIN)
+          @state[:in_eval_block] = true
         elsif @line.readif(T_EVAL_APPEND)
           _l_eval(append:true)
         elsif @line.readif(T_EVAL)
