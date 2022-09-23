@@ -333,7 +333,7 @@ module Remid
                 r << resolve_fcall(ibuf[1..-1])
               else
                 #puts Rainbow(ibuf).red
-                r << ("#{eval(ibuf, @a_binding)}" rescue "?")
+                r << ("#{eval(ibuf, @a_binding)}")
               end
             end
           else
