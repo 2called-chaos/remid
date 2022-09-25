@@ -1,7 +1,7 @@
 module Remid
   class Context
     COL = 10
-    attr_reader :opts, :meta, :objectives, :scheduler, :functions, :blobs, :jsons, :parser, :on_load, :on_tick
+    attr_reader :opts, :meta, :objectives, :scheduler, :functions, :blobs, :jsons, :parser, :on_load, :on_tick, :tag
     attr_accessor :function_namespace, :scoreboard_namespace, :relative_target
 
     def initialize
@@ -15,6 +15,7 @@ module Remid
       @meta = OpenStruct.new(version: 10, description: "An undescribed datapack by an unknown author")
       @scheduler = FunctionScheduler.new(self)
       @objectives = ObjectiveManager.new(self)
+      @tag = TagManager.new(self)
       @on_load = [:__remid_auto]
       @on_tick = [:__remid_auto]
     end
@@ -77,6 +78,7 @@ module Remid
       __remid_serialize_mcmeta(data_path, result, &exporter)
       __remid_serialize_remid_auto(data_path, result, :load, &exporter)
       __remid_serialize_remid_auto(data_path, result, :tick, &exporter)
+      __remid_serialize_tags(data_path, result, &exporter)
       __remid_serialize_jsons(data_path, result, &exporter)
       __remid_serialize_functions(data_path, result, &exporter)
       __remid_serialize_blobs(data_path, result, &exporter)
