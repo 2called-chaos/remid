@@ -8,6 +8,7 @@ module Remid
       @opts = OpenStruct.new({
         mcmeta: true,
         pretty_json: true,
+        autofix_trailing_commas: false,
       })
       @functions = {}
       @blobs = {}

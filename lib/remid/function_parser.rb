@@ -176,13 +176,32 @@ module Remid
           end
         end
       end
-      @rbuf << @cbuf.shift while @cbuf.length > 0
-      if Thread.current == Thread.main
-        Thread.current[:fparse_rbuf] = nil
-        Thread.current[:fparse_cbuf] = nil
-        Thread.current[:fparse_wbuf] = nil
-      end
 
+      commit_cbuf.tap do
+        # if Thread.current == Thread.main
+          Thread.current[:fparse_rbuf] = nil
+          Thread.current[:fparse_cbuf] = nil
+          Thread.current[:fparse_wbuf] = nil
+        # end
+      end
+    end
+
+    def commit_cbuf
+      if context.opts.autofix_trailing_commas
+        while cl = @cbuf.shift
+          unless cl.start_with?("#")
+            while ci = cl.index(/,(\s+[\}\]])/)
+              unless context.opts.autofix_trailing_commas == :silent
+                warnings << "autofix: removed trailing comma in output-line #{@rbuf.length + 1}:#{ci} `#{cl[([ci-10, 0].max)..(ci + 10)]}' of #{@rsrc}"
+              end
+              cl = cl.sub(/,(\s+[\}\]])/, '\1')
+            end
+          end
+          @rbuf << cl
+        end
+      else
+        @rbuf << @cbuf.shift while @cbuf.length > 0
+      end
       @rbuf
     end
 
@@ -208,8 +227,7 @@ module Remid
       #puts "open #{@state[:block_indent]}"
       if @state[:block_indent] == 1
         @state[:block_header] = @line.read
-        @rbuf << @cbuf.shift while @cbuf.length > 0
-        #Thread.current[:fparse_cbuf] = @cbuf = @state[:block_buffer]
+        commit_cbuf
       end
     end
 

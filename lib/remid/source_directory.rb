@@ -111,20 +111,26 @@ module Remid
         when :json
           File.open(@d_bld.join(rel_file), "wb") {|f| f.write(ctx.opts.pretty_json ? JSON.pretty_generate(file_or_data) : JSON.generate(file_or_data)) }
           puts col("*", :silver) + "./" + rel_file.to_s
-          warnings.each do |warning|
-            warn col("") + "  ! ".red + warning.red
-          end
+          print_serialization_warnings(warnings)
         when :function
           file_or_data.result_buffer # pre-parse for warnings
           puts col(file_or_data.warnings.empty? ? "#" : "WARN #", file_or_data.warnings.empty? ? :green : :yellow) + "./" + rel_file.to_s
-          warnings.each do |warning|
-            warn col("") + "  ! ".red + warning.red
-          end
+          print_serialization_warnings(warnings)
           File.open(@d_bld.join(rel_file), "wb") {|f| f.write(file_or_data.as_string) }
         else
           raise "don't know how to serialize #{type}"
         end
         @d_bld.join(rel_file)
+      end
+    end
+
+    def print_serialization_warnings warnings
+      warnings.each do |warning|
+        if warning.start_with?("autofix: ")
+          warn col("") + "  i ".yellow + warning[9..-1].cyan
+        else
+          warn col("") + "  ! ".red + warning.red
+        end
       end
     end
 
