@@ -439,10 +439,22 @@ module Remid
 
     def resolve_fcall fcall
       fcall = "#{@context.function_namespace}:#{fcall}" unless fcall[T_NSSEP]
+
+      if fcall["@"]
+        fcall, fsched = fcall.split("@").map(&:strip)
+        append = fsched.start_with?("<<")
+        fsched = fsched[2..-1].strip if append
+      end
+
       if fcall.start_with?("#{@context.function_namespace}:") && !@context.functions[fcall.split(":")[1]]
         @warnings << "calling undefined function `#{fcall}' in #{@rsrc}:#{@li_no}"
       end
-      "function #{fcall}"
+
+      if fsched
+        $remid.scheduler.schedule(fcall, fsched, append: append)
+      else
+        "function #{fcall}"
+      end
     end
 
     def result_buffer
