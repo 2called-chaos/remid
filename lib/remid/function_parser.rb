@@ -308,6 +308,7 @@ module Remid
             else
               depth += 1
             end
+            ibuf << str[pointer]
           elsif str[pointer] == "}"
             if str[pointer - 1] == T_BACKSLASH
               ibuf.pop # remove backslash
@@ -319,7 +320,6 @@ module Remid
 
             if depth == 0
               in_interp = false
-              pointer += 1
 
               if ibuf[0] == T_GT && ibuf[1] == T_BANG
                 sp = 1
@@ -335,10 +335,11 @@ module Remid
                 #puts Rainbow(ibuf).red
                 r << ("#{eval(ibuf, @a_binding)}")
               end
+            else
+              ibuf << str[pointer]
             end
           else
             ibuf << str[pointer]
-            pointer += 1
           end
         else
           if str[pointer] == "#" && str[pointer + 1] == "{"
@@ -353,8 +354,8 @@ module Remid
             end
           end
           r << str[pointer]
-          pointer += 1
         end
+        pointer += 1
       end
       r.join("")
     end
@@ -435,5 +436,3 @@ module Remid
     end
   end
 end
-
-# @todo eval __BEGIN__ => __END__ with puts wrapper (puts == output)
