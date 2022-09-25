@@ -103,8 +103,11 @@ module Remid
         FileUtils.mkdir_p(@d_bld.join(rel_file.dirname))
         case type
         when :blob
-          FileUtils.cp(file_or_data, @d_bld.join(rel_file))
           puts col("F", :yellow) + "./" + rel_file.to_s
+          if File.exist?(@d_bld.join(rel_file))
+            warn col("") + "  ! ".red + "overwriting existing (generated) file"
+          end
+          FileUtils.cp(file_or_data, @d_bld.join(rel_file))
         when :json
           File.open(@d_bld.join(rel_file), "wb") {|f| f.write(ctx.opts.pretty_json ? JSON.pretty_generate(file_or_data) : JSON.generate(file_or_data)) }
           puts col("*", :silver) + "./" + rel_file.to_s
