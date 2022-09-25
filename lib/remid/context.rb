@@ -70,68 +70,79 @@ module Remid
       @jsons[rel_file] = data
     end
 
-    def __remid_serialize
-      fcount, size = 0, 0
+    def __remid_serialize &exporter
       data_path = Pathname.new("data")
+      result = { count: 0, size: 0 }
 
+      __remid_serialize_mcmeta(data_path, result, &exporter)
+      __remid_serialize_remid_auto(data_path, result, :load, &exporter)
+      __remid_serialize_remid_auto(data_path, result, :tick, &exporter)
+      __remid_serialize_jsons(data_path, result, &exporter)
+      __remid_serialize_functions(data_path, result, &exporter)
+      __remid_serialize_blobs(data_path, result, &exporter)
+
+      result
+    end
+
+    def __remid_serialize_mcmeta data_path, result
       if @opts.mcmeta
-        fcount += 1
-        size += yield(:json, Pathname.new("pack.mcmeta"), { pack: @meta.to_h }, []).size
+        result[:count] += 1
+        result[:size] += yield(:json, Pathname.new("pack.mcmeta"), { pack: @meta.to_h }, []).size
+      end
+    end
+
+    def __remid_serialize_remid_auto data_path, result, fname
+      fcol = instance_variable_get(:"@on_#{fname}")
+      if fcol[0] == :__remid_auto
+        fcol.shift
+        fcol.unshift(fname.to_s) if @functions[fname.to_s]
       end
 
-      if @on_load[0] == :__remid_auto
-        @on_load.shift
-        @on_load.unshift("load") if @functions["load"]
-      end
-      if @on_load.any?
+      if fcol.any?
         fwarns = []
 
-        scoped_on_load = @on_load.map do |lfunc|
+        scoped_fcol = fcol.map do |lfunc|
           lfunc = "#{@function_namespace}:#{lfunc}" unless lfunc[FunctionParser::T_NSSEP]
           if lfunc.start_with?("#{@function_namespace}:") && !@functions[lfunc.split(":")[1]]
-            fwarns << "calling undefined function `#{lfunc}' in $remid.on_load"
+            fwarns << "calling undefined function `#{lfunc}' in $remid.on_#{fname}"
           end
           lfunc
         end
 
-        fcount += 1
-        size += yield(:json, Pathname.new("data/minecraft/tags/functions/load.json"), { values: scoped_on_load }, fwarns).size
+        result[:count] += 1
+        result[:size] += yield(:json, data_path.join("minecraft/tags/functions/#{fname}.json"), { values: scoped_fcol }, fwarns).size
       end
+    end
 
-      if @on_tick[0] == :__remid_auto
-        @on_tick.shift
-        @on_tick.unshift("tick") if @functions["tick"]
-      end
-      if @on_tick.any?
-        fwarns = []
-
-        scoped_on_tick = @on_tick.map do |lfunc|
-          lfunc = "#{@function_namespace}:#{lfunc}" unless lfunc[FunctionParser::T_NSSEP]
-          if lfunc.start_with?("#{@function_namespace}:") && !@functions[lfunc.split(":")[1]]
-            fwarns << "calling undefined function `#{lfunc}' in $remid.on_tick"
-          end
-          lfunc
+    def __remid_serialize_tags data_path, result
+      @tag.tags.each do |_, tag_type|
+        tag_type.tags.each do |_, tag|
+          json_path = data_path.join("#{@function_namespace}/tags/#{tag_type.type}/#{tag.key}.json")
+          result[:count] += 1
+          result[:size] += yield(:json, json_path, tag.as_data, []).size
         end
-
-        fcount += 1
-        size += yield(:json, Pathname.new("data/minecraft/tags/functions/tick.json"), { values: scoped_on_tick }, fwarns).size
       end
+    end
 
+    def __remid_serialize_jsons data_path, result
       @jsons.each do |rel_file, data|
-        fcount += 1
-        size += yield(:json, data_path.join(rel_file), data, []).size
+        result[:fcount] += 1
+        result[:size] += yield(:json, data_path.join(rel_file), data, []).size
       end
+    end
 
+    def __remid_serialize_functions data_path, result
       @functions.each do |rel_file, data|
-        fcount += 1
-        size += yield(:function, data_path.join(@function_namespace, "functions", Pathname.new("#{rel_file}.mcfunction")), data, data.warnings).size
+        result[:count] += 1
+        result[:size] += yield(:function, data_path.join(@function_namespace, "functions", Pathname.new("#{rel_file}.mcfunction")), data, data.warnings).size
       end
+    end
 
+    def __remid_serialize_blobs data_path, result
       @blobs.each do |rel_file, file|
-        fcount += 1
-        size += yield(:blob, data_path.join(rel_file), file, []).size
+        result[:count] += 1
+        result[:size] += yield(:blob, data_path.join(rel_file), file, []).size
       end
-      [fcount, size]
     end
 
     def function_namespace= value

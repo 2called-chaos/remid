@@ -21,7 +21,7 @@ module Remid
       puts col("COMPILING", :yellow) + @dir.to_s.magenta
       return unless ensure_source
 
-      fcount, size = 0, 0
+      result = nil
       rt = Benchmark.realtime {
         # create context
         $remid = context = Context.new
@@ -31,9 +31,10 @@ module Remid
         create_build_directoy
         collect_source_files(context)
         puts col("WRITING", :yellow) + "writing pack data"
-        fcount, size = serialize_context(context)
+        result = serialize_context(context)
       }
-      finally_move_build(rt, fcount, size)
+      result[:rt] = rt
+      finally_move_build(result)
     end
 
     def ensure_source
@@ -124,7 +125,7 @@ module Remid
       end
     end
 
-    def finally_move_build rt, fcount, size
+    def finally_move_build result
       # move old build if it exists
       if @d_dst.exist?
         puts col("INFO", :cyan) + "moving " + "./#{@dst}".cyan + " to " + "./#{@dst}.prev".blue
@@ -133,9 +134,9 @@ module Remid
       end
 
       # move finished build
-      fsize = size > 1024 * 1024 ? "#{"%.2f" % (size.to_f / (1024 * 1024))}MB" : "#{"%.2f" % (size.to_f / (1024))}KB"
-      puts col("SUCCESS", :green) + "Build successfully to ".white + "./#{@dst}".cyan + " in ".white + "#{"%.3f" % rt}s".yellow
-      puts col("INFO", :cyan)     + "#{fcount}".yellow + " files / " + fsize.yellow
+      fsize = result[:size] > 1024 * 1024 ? "#{"%.2f" % (result[:size].to_f / (1024 * 1024))}MB" : "#{"%.2f" % (result[:size].to_f / (1024))}KB"
+      puts col("SUCCESS", :green) + "Build successfully to ".white + "./#{@dst}".cyan + " in ".white + "#{"%.3f" % result[:rt]}s".yellow
+      puts col("INFO", :cyan)     + "#{result[:count]}".yellow + " files / " + fsize.yellow
       FileUtils.mv(@d_bld, @d_dst)
       @d_dst
     end
