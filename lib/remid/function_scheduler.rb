@@ -20,9 +20,11 @@ module Remid
       raise "no context" unless cbuf = Thread.current[:fparse_cbuf]
 
       if which == :scheduled
-        @scheduled.each do |name|
-          cbuf << "actually schedule clear #{name}"
-        end
+        cbuf << proc {|cbuf|
+          @scheduled.each do |name|
+            cbuf << "actually schedule clear #{name}"
+          end
+        }
       elsif which == :functions
         @parent.functions.each do |name, _|
           cbuf << "schedule clear #{@namespace}:#{name}"

@@ -189,6 +189,17 @@ module Remid
     def commit_cbuf
       if context.opts.autofix_trailing_commas
         while cl = @cbuf.shift
+          if cl.is_a?(Proc)
+            if @skip_indent == 0
+              cl.call(tmpcbuf = [])
+              tmpcbuf = tmpcbuf.reverse
+              @cbuf.unshift(tmpcbuf.shift) while tmpcbuf.length > 0
+            else
+              @rbuf << cl
+            end
+            next
+          end
+
           unless cl.start_with?("#")
             while ci = cl.index(/,(\s+[\}\]])/)
               unless context.opts.autofix_trailing_commas == :silent

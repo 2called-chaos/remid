@@ -8,8 +8,9 @@ module Remid
       @opts.assert_valid_keys(:name, :display, :render)
     end
 
-    def create
-      raise "no context" unless cbuf = Thread.current[:fparse_cbuf]
+    def create cbuf: nil
+      cbuf ||= Thread.current[:fparse_cbuf]
+      raise "no context" unless cbuf
       cmd = "scoreboard objectives add #{@key} #{@type}"
       cmd << " \"#{@opts[:name]}\"" if @opts[:name]
       cbuf << cmd
@@ -23,8 +24,9 @@ module Remid
       end
     end
 
-    def destroy
-      raise "no context" unless cbuf = Thread.current[:fparse_cbuf]
+    def destroy cbuf: nil
+      cbuf ||= Thread.current[:fparse_cbuf]
+      raise "no context" unless cbuf
       cbuf << "scoreboard objectives remove #{@key}"
     end
   end

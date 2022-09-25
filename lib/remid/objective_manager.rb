@@ -12,16 +12,26 @@ module Remid
       self[rkey] = Objective.new(self, rkey, type, **kw)
     end
 
-    def create_all
-      each do |key, obj|
-        obj.create
-      end
+    def create_all cbuf: nil
+      cbuf ||= Thread.current[:fparse_cbuf]
+      raise "no context" unless cbuf
+      ref1 = self
+      cbuf << proc {|cbuf|
+        ref1.each do |key, obj|
+          obj.create(cbuf: cbuf)
+        end
+      }
     end
 
-    def destroy_all
-      each do |key, obj|
-        obj.destroy
-      end
+    def destroy_all cbuf: nil
+      cbuf ||= Thread.current[:fparse_cbuf]
+      raise "no context" unless cbuf
+      ref1 = self
+      cbuf << proc {|cbuf|
+        ref1.each do |key, obj|
+          obj.destroy(cbuf: cbuf)
+        end
+      }
     end
 
     def method_missing meth, *args, **kwargs, &block
