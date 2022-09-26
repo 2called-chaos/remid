@@ -71,6 +71,10 @@ module Remid
           file = Pathname.new(path)
           rel_file = file.relative_path_from(@d_src)
 
+          if rel_file.parent.fnmatch(".")
+            rel_file = rel_file.parent.parent.join(rel_file)
+          end
+
           case file.extname
           when ".json" # validate json is readable
             begin
@@ -103,9 +107,10 @@ module Remid
         FileUtils.mkdir_p(@d_bld.join(rel_file.dirname))
         case type
         when :blob
-          puts col("F", :yellow) + "./" + rel_file.to_s
-          if File.exist?(@d_bld.join(rel_file))
-            warn col("") + "  ! ".red + "overwriting existing (generated) file"
+          already_exists = File.exist?(@d_bld.join(rel_file))
+          puts col("F", already_exists ? :red : :magenta) + "./" + rel_file.to_s
+          if already_exists
+            warn col("") + "  ! ".red + "overwriting existing (generated) file".red
           end
           FileUtils.cp(file_or_data, @d_bld.join(rel_file))
         when :json
