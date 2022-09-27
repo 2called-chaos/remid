@@ -127,6 +127,8 @@ module Remid
             @state[:eval_block] << @line.read
           end
           next
+        elsif @line.peek == T_EVAL_END
+          raise "unexcepected T_EVAL_END #{T_EVAL_END} in #{@rsrc}:#{@li_no}"
         end
 
         # indent
@@ -167,6 +169,7 @@ module Remid
           @cbuf << @line.read
         elsif @line.readif(T_EVAL_BEGIN)
           @state[:in_eval_block] = true
+          @state[:eval_block_lino] = @li_no
         elsif @line.readif(T_EVAL_APPEND)
           _l_eval(append:true)
         elsif @line.readif(T_EVAL)
@@ -201,6 +204,10 @@ module Remid
           _i_ral_open if @cbuf.last&.end_with?(T_DOUBLE_LT)
         end
       end
+
+      raise "OpenRAL: expected >> but found EOF (opened `#{@state[:ral_entry]}' in #{@rsrc}:#{@state[:ral_lino]})" if @state[:in_ral]
+      raise "OpenAnonymous: expected >>> but found EOF (opened `#{@state[:anon_entry]}' in #{@rsrc}:#{@state[:anon_lino]})" if @state[:in_anonymous]
+      raise "OpenEvalBlock: expected __END__ but found EOF (opened in #{@rsrc}:#{@state[:eval_block_lino]})" if @state[:in_eval_block]
 
       commit_cbuf
     ensure
@@ -249,7 +256,7 @@ module Remid
         a_binding.local_variable_set(:a_src, @src)
         a_binding.local_variable_set(:a_fname, @fname)
         a_binding.local_variable_set(:a_buffer, input_buffer)
-        a_binding.local_variable_set(:a_li_offset, @li_no - input_buffer.length - (header ? 1 : 0))
+        a_binding.local_variable_set(:a_li_offset, @li_no - input_buffer.length - (header ? 1 : 0) - 1)
         a_binding.local_variable_set(:a_skip_indent, @skip_indent + 1)
         a_binding.local_variable_set(:x_binding, @a_binding)
 
@@ -296,10 +303,14 @@ module Remid
     def _i_ral_open
       @state[:in_ral] = true
       @state[:ral_entry] = @cbuf.pop.delete_suffix(T_DOUBLE_LT)
+      @state[:ral_lino] = @li_no
       @state[:ral_buffer] = []
     end
 
     def _l_ral_close
+      if !@state[:in_ral]
+        raise "unexcepected RAL close >> in #{@rsrc}:#{@li_no}"
+      end
       @state.delete(:in_ral)
 
       if @state[:ral_buffer].empty?
@@ -321,6 +332,9 @@ module Remid
     end
 
     def _l_anon_close
+      if !@state[:in_anonymous]
+        raise "unexcepected AnonymousFunction close >>> in #{@rsrc}:#{@li_no}"
+      end
       @state.delete(:in_anonymous)
 
       if @state[:anon_buffer].empty?
@@ -365,6 +379,9 @@ module Remid
     end
 
     def _l_block_close
+      if @state[:block_indent] == 0
+        raise "unexcepected T_BLOCK_CLOSE #{T_BLOCK_CLOSE} in #{@rsrc}:#{@li_no}"
+      end
       @line.read_while(SPACES) # padding
       #puts "close #{@state[:block_indent]}"
       # marks block end
@@ -469,7 +486,10 @@ module Remid
         end
         pointer += 1
       end
+      raise "unmatched interpolation" if depth > 0
       r.join("")
+    rescue Exception => ex
+      raise "#{ex.class}: #{ex.message} in #{@rsrc}:#{@li_no}"
     end
 
     def resolve_objective str
