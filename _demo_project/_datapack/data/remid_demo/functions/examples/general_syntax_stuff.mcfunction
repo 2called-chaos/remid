@@ -10,4 +10,4 @@ summon cow ~ ~ ~ { Tags: [delicious] }
 
 
 # Also you can have inline comments this way
-execute as @a[tag=some_unreadable_selector] at @s if block ~ ~ ~  air run summon cow ~ ~ ~ { Tags: [delicious], Invulnerable: 1 }
+execute as @a[tag=some_unreadable_selector] at @s if block ~ ~ ~ air run summon cow ~ ~ ~ { Tags: [delicious], Invulnerable: 1 }

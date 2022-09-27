@@ -30,7 +30,7 @@
 > an_objective @s
 
 # providing just the objective resolves the objective name according to the namespacing rules
-execute if score @s #{> registry} run say hi
+execute if score @s #{> registry} matches 1 run say hi
 execute
 	as @s[scores={
 		#{>registry} = 1..2,

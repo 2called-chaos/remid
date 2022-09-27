@@ -18,7 +18,7 @@ execute as @e[tag=expensive_selector] at @s run <<<
 # You can also nest this and do all sort of things, a more complicated example
 execute as @e[tag=expensive_selector] at @s run <<<
 	say one
-	execute as @[tag=subselection] run <<<
+	execute as @s[tag=subselection] run <<<
 		say one-a
 		say one-b
 		say one-c

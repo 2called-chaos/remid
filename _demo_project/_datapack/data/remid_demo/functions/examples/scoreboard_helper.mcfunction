@@ -30,5 +30,5 @@ scoreboard players enable @a rd_an_objective
 scoreboard players get @s rd_an_objective
 
 # providing just the objective resolves the objective name according to the namespacing rules
-execute if score @s rd_registry run say hi
+execute if score @s rd_registry matches 1 run say hi
 execute as @s[scores={ rd_registry = 1..2, rd_whatever = 1.. }] run say hi

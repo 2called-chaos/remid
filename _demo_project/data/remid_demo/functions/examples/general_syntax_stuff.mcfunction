@@ -22,7 +22,7 @@ execute
 	at @s
 	if
 		# only if they are in air
-		block ~ ~ ~  air
+		block ~ ~ ~ air
 	run
 		# this extra indendation is not necessary but makes it more readable
 		summon cow ~ ~ ~
