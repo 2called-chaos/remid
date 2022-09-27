@@ -6,6 +6,7 @@ REMID is a "transpiler" or more like a Frankenstein monster of a code generator 
 
 * providing some framework-ish features around datapacks and its elements (like an entity helper)
 * extending the mcfunction syntax
+  * multi-line commands
   * syntax sugar and generic helpers
   * some "compilation" warnings such as referencing undefined functions or objectives (given that you use the helpers)
   * interpolation with the Ruby interpreter
@@ -33,7 +34,7 @@ REMID is supposed to be a Ruby gem but it will not be released as one until some
 * Clone (or extract the zip of) the repository
 * in a terminal cd into the cloned directory and run `bundle install`
 
-
+You need to either add the bin directory to your PATH or use absolute/relative paths to invoke the remid.cmd executable. This won't be necessary once it's installed as a gem.
 
 ## Usage
 
@@ -54,7 +55,7 @@ If you are **migrating with an existing datapack** the existing data folder you 
 Edit the file `remid.rb` and add the only required thing (replace the namespace with yours):
 
 ```ruby
-$remid.function_namespace   = "MY_NAMESPACE"
+$remid.function_namespace = "MY_NAMESPACE"
 ```
 
 You can now use REMID with this project folder. The compiled datapack will be written to `./_datapack`. See Docs for more remid.rb options and what you can now do within mcfunction files.
@@ -84,12 +85,12 @@ Example usage:
 
 You may take inspiration from my scripts, take a look here: https://gist.github.com/2called-chaos/0390bfdf1be577f3dd2e6bbaa281e3d6
 
+Most of them are currently also included in the demo project folder.
 
 
 ## Docs / remid.rb
 
-Take a look at the [demo project](https://github.com/2called-chaos/remid/tree/master/_demo_project) in this repository. It contains a lot of documented examples of the options and syntax. I recommend compiling it and look what it generates.
-
+Take a look at the [demo project](https://github.com/2called-chaos/remid/tree/master/_demo_project) in this repository. It contains a lot of documented examples of the options and syntax. The `_datapack` folder contains the compiled output so you can see and compare how things work.
 
 
 ## Why is X so weird?
@@ -98,6 +99,13 @@ The syntax additions are a bit all over the place. Initially I wanted it to be v
 
 Technically it is easy to change the operators but I can't really bother to come up with a better set of operators myself :)
 
+
+## Todo
+
+  * Allow empty lines in multiline commands (currently that will split them into 2 commands)
+  * Figure out a syntax sugar to schedule anonymous functions more easily
+  * Add and increment on an Entity helper class
+  * JSON text & book helper / text placeholders
 
 
 ## Contributing
