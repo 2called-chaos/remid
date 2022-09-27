@@ -1,0 +1,8 @@
+{
+  "replace": true,
+  "values": [
+    "something:whatever",
+    "remid_demo:boats",
+    "dependency:something"
+  ]
+}

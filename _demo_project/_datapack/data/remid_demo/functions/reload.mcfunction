@@ -1,0 +1,2 @@
+function remid_demo:kill
+function remid_demo:init

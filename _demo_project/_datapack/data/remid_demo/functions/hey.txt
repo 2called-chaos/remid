@@ -1,0 +1,1 @@
+this file will just get copied as is because it's not a json or mcfunction file

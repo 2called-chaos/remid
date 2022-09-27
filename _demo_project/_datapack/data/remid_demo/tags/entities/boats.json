@@ -1,0 +1,8 @@
+{
+  "replace": true,
+  "values": [
+    "minecraft:boat",
+    "minecraft:chest_boat",
+    "minecraft:another_one"
+  ]
+}

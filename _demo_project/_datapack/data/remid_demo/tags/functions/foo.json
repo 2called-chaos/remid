@@ -1,0 +1,8 @@
+{
+  "replace": false,
+  "values": [
+    "remid_demo:bar",
+    "remid_demo:baz",
+    "foobar:barbaz"
+  ]
+}
