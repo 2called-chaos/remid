@@ -16,6 +16,8 @@ module Remid
           warn "[ABORT] #{ex.message}"
           warn "Run `#{$0} --help' for more info".cyan
           exit 1
+        rescue SystemExit
+          # do nothing
         rescue Exception => ex
           warn "[FATAL] #{ex.class}: #{ex.message}".red
           ex.backtrace.each do |l|

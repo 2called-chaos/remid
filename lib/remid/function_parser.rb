@@ -121,7 +121,7 @@ module Remid
               @__clone_parent.cbuf
             end
             obj.instance_eval(@state[:eval_block].join("\n"))
-            puts @state[:eval_block]
+            #puts @state[:eval_block]
             @state[:eval_block].clear
           else
             @state[:eval_block] << @line.read
