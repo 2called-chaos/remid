@@ -28,6 +28,7 @@ module Remid
 
   class FunctionParser
     attr_reader :warnings, :payload, :context, :cbuf, :fname
+    attr_accessor :exception
 
     SPACES = [" ", "\t"].freeze
     ENCLOSERS = ["[", "]", "{", "}"].freeze
@@ -219,33 +220,38 @@ module Remid
     end
 
     def commit_cbuf
-      if context.opts.autofix_trailing_commas
-        while cl = @cbuf.shift
-          if cl.is_a?(Proc)
-            if @skip_indent == 0
-              cl.call(tmpcbuf = [])
-              tmpcbuf = tmpcbuf.reverse
-              @cbuf.unshift(tmpcbuf.shift) while tmpcbuf.length > 0
-            else
-              @rbuf << cl
-            end
-            next
-          end
+      @rbuf << @cbuf.shift while @cbuf.length > 0
+      @rbuf
+    end
 
+    def finalize_buffer!
+      old_rbuf = @rbuf.dup
+      @rbuf.clear
+
+      # call delayed procs
+      old_rbuf.each do |rbe|
+        if rbe.is_a?(Proc)
+          rbe.call(tmpcbuf = [])
+          tmpcbuf = tmpcbuf.reverse
+          @rbuf << tmpcbuf.shift while tmpcbuf.length > 0
+        else
+          @rbuf << rbe
+        end
+      end
+
+      # autofix trailing commas
+      if context.opts.autofix_trailing_commas
+        @rbuf.each_with_index do |cl, rbi|
           unless cl.start_with?("#")
             while ci = cl.index(/,(\s+[\}\]])/)
               unless context.opts.autofix_trailing_commas == :silent
-                warnings << "autofix: removed trailing comma in output-line #{@rbuf.length + 1}:#{ci} `#{cl[([ci-10, 0].max)..(ci + 10)]}' of #{@rsrc}"
+                warnings << "autofix: removed trailing comma in output-line #{rbi + 1}:#{ci} `#{cl[([ci-10, 0].max)..(ci + 10)]}' of #{@rsrc}"
               end
-              cl = cl.sub(/,(\s+[\}\]])/, '\1')
+              cl.sub!(/,(\s+[\}\]])/, '\1')
             end
           end
-          @rbuf << cl
         end
-      else
-        @rbuf << @cbuf.shift while @cbuf.length > 0
       end
-      @rbuf
     end
 
     def _execute_sub input_buffer, header: nil, footer: nil, concat: true, concat_warnings: nil

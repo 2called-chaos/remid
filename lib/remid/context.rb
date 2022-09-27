@@ -152,6 +152,15 @@ module Remid
 
     def __remid_serialize_functions data_path, result
       @functions.each do |rel_file, data|
+        begin
+          data.result_buffer # pre-parse for warnings and exceptions
+        rescue Exception => ex
+          data.exception = ex
+        end
+      end
+
+      @functions.each do |rel_file, data|
+        data.finalize_buffer!
         result[:count] += 1
         result[:size] += yield(:function, data_path.join(@function_namespace, "functions", Pathname.new("#{rel_file}.mcfunction")), data, data.warnings).size
       end

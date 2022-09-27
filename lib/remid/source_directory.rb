@@ -120,13 +120,11 @@ module Remid
           print_serialization_warnings(warnings)
           File.open(@d_bld.join(rel_file), "wb") {|f| f.write(ctx.opts.pretty_json ? JSON.pretty_generate(file_or_data) : JSON.generate(file_or_data)) }
         when :function
-          begin
-            file_or_data.result_buffer # pre-parse for warnings
-          rescue Exception => ex
+          if file_or_data.exception
             puts col("ERROR #", :red) + "./" + rel_file.to_s
-            raise(ex)
+            raise(file_or_data.exception)
           end
-          puts col(file_or_data.warnings.empty? ? "#" : "WARN #", file_or_data.warnings.empty? ? :green : :yellow) + "./" + rel_file.to_s
+          puts col(warnings.empty? ? "#" : "WARN #", warnings.empty? ? :green : :yellow) + "./" + rel_file.to_s
           print_serialization_warnings(warnings)
           File.open(@d_bld.join(rel_file), "wb") {|f| f.write(file_or_data.as_string) }
         when :anonymous_function
