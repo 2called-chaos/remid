@@ -505,7 +505,7 @@ module Remid
     end
 
     def resolve_scoreboard_instruct instruct
-      if m = instruct.match(/^([^\s]+) ([^\s]+) (=|\+=|\-=) (\d+)$/i)
+      if m = instruct.match(/^([^\s]+)\s+([^\s]+)\s+(=|\+=|\-=)\s+(\d+)$/i)
         # > $objective $player = VAL
         # > $objective $player += VAL
         # > $objective $player -= VAL
@@ -517,11 +517,11 @@ module Remid
         when "-="
           "scoreboard players remove #{m[2]} #{resolve_objective(m[1])} #{m[4]}"
         end
-      elsif m = instruct.match(/^([^\s]+) ([^\s]+) (reset|enable)$/i)
+      elsif m = instruct.match(/^([^\s]+)\s+([^\s]+)\s+(reset|enable)$/i)
         # > $objective $player reset
         # > $objective $player enable
         "scoreboard players #{m[3]} #{m[2]} #{resolve_objective(m[1])}"
-      elsif m = instruct.match(/^([^\s]+) ([^\s]+) (\+\+|\-\-)$/i)
+      elsif m = instruct.match(/^([^\s]+)\s+([^\s]+)\s+(\+\+|\-\-)$/i)
         # > $objective $player ++
         # > $objective $player --
         case m[3]
@@ -530,7 +530,7 @@ module Remid
         when "--"
           "scoreboard players remove #{m[2]} #{resolve_objective(m[1])} 1"
         end
-      elsif m = instruct.match(/^([^\s]+) ([^\s]+)$/i)
+      elsif m = instruct.match(/^([^\s]+)\s+([^\s]+)$/i)
         # > $objective $player
         "scoreboard players get #{m[2]} #{resolve_objective(m[1])}"
       elsif m = instruct.match(/^([^\s]+)$/i)
@@ -542,9 +542,9 @@ module Remid
     end
 
     def resolve_scoreboard_op_instruct instruct
-      if m = instruct.match(/^([^\s]+) ([^\s]+) (=|\+=|\-=|\*=|\/=|%=|><|<) ([^\s]+)$/i)
+      if m = instruct.match(/^([^\s]+)\s+([^\s]+)\s+(=|\+=|\-=|\*=|\/=|%=|><|<|>)\s+([^\s]+)$/i)
         "scoreboard players operation #{m[2]} #{resolve_objective(m[1])} #{m[3]} #{m[4]} #{resolve_objective(m[1])}"
-      elsif m = instruct.match(/^([^\s]+) ([^\s]+) (=|\+=|\-=|\*=|\/=|%=|><|<) ([^\s]+) ([^\s]+)$/i)
+      elsif m = instruct.match(/^([^\s]+)\s+([^\s]+)\s+(=|\+=|\-=|\*=|\/=|%=|><|<|>)\s+([^\s]+)\s+([^\s]+)$/i)
         "scoreboard players operation #{m[2]} #{resolve_objective(m[1])} #{m[3]} #{m[5]} #{resolve_objective(m[4])}"
       else
         raise "did not understand scoreboard-operation instruction: `#{instruct}'"
