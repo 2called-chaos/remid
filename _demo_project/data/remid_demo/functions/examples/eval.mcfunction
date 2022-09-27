@@ -55,7 +55,6 @@ class MyRandomHelperThatShouldntBeHere
 
   def do_something_wild out
     @wildness.times do |i|
-      # despite scoping we have an out here
       out << "say this is wild times #{i}"
     end
   end
