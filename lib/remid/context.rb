@@ -14,7 +14,7 @@ module Remid
       @anonymous_functions = {}
       @blobs = {}
       @jsons = {}
-      @meta = OpenStruct.new(version: 10, description: "An undescribed datapack by an unknown author")
+      @meta = OpenStruct.new(pack_format: 10, description: "An undescribed datapack by an unknown author")
       @scheduler = FunctionScheduler.new(self)
       @objectives = ObjectiveManager.new(self)
       @tag = TagManager.new(self)
