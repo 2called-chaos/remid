@@ -3,6 +3,8 @@ using Rainbow
 module Remid
   class SourceDirectory
     COL = 10
+    attr_reader :dir, :d_src, :d_bld, :d_dst, :context
+
     def initialize dir
       @dir = Pathname.new(dir.delete_suffix("/").delete_suffix("\\"))
       @src = "data"
@@ -17,14 +19,14 @@ module Remid
       name.rjust(COL).color(color) + "  "
     end
 
-    def compile!
+    def compile! build_no: nil
       puts col("COMPILING", :yellow) + @dir.to_s.magenta
       return unless ensure_source
 
       result = nil
       rt = Benchmark.realtime {
         # create context
-        $remid = context = Context.new
+        $remid = @context = context = Context.new
         $remid.relative_target = @dir
         $remid.__remid_load_manifest(@dir.join("remid.rb"))
 
@@ -34,7 +36,7 @@ module Remid
         result = serialize_context(context)
       }
       result[:rt] = rt
-      finally_move_build(result)
+      finally_move_build(result, build_no: build_no)
     end
 
     def ensure_source
@@ -114,11 +116,16 @@ module Remid
           end
           FileUtils.cp(file_or_data, @d_bld.join(rel_file))
         when :json
-          File.open(@d_bld.join(rel_file), "wb") {|f| f.write(ctx.opts.pretty_json ? JSON.pretty_generate(file_or_data) : JSON.generate(file_or_data)) }
           puts col("*", :silver) + "./" + rel_file.to_s
           print_serialization_warnings(warnings)
+          File.open(@d_bld.join(rel_file), "wb") {|f| f.write(ctx.opts.pretty_json ? JSON.pretty_generate(file_or_data) : JSON.generate(file_or_data)) }
         when :function
-          file_or_data.result_buffer # pre-parse for warnings
+          begin
+            file_or_data.result_buffer # pre-parse for warnings
+          rescue Exception => ex
+            puts col("ERROR #", :red) + "./" + rel_file.to_s
+            raise(ex)
+          end
           puts col(file_or_data.warnings.empty? ? "#" : "WARN #", file_or_data.warnings.empty? ? :green : :yellow) + "./" + rel_file.to_s
           print_serialization_warnings(warnings)
           File.open(@d_bld.join(rel_file), "wb") {|f| f.write(file_or_data.as_string) }
@@ -139,7 +146,7 @@ module Remid
       end
     end
 
-    def finally_move_build result
+    def finally_move_build result, build_no: nil
       # move old build if it exists
       if @d_dst.exist?
         puts col("INFO", :cyan) + "moving " + "./#{@dst}".cyan + " to " + "./#{@dst}.prev".blue
@@ -149,7 +156,7 @@ module Remid
 
       # move finished build
       fsize = result[:size] > 1024 * 1024 ? "#{"%.2f" % (result[:size].to_f / (1024 * 1024))}MB" : "#{"%.2f" % (result[:size].to_f / (1024))}KB"
-      puts col("SUCCESS", :green) + "Build successfully to ".white + "./#{@dst}".cyan + " in ".white + "#{"%.3f" % result[:rt]}s".yellow
+      puts col("SUCCESS", :green) + "Build#{"[##{build_no}]" if build_no} successfully to ".white + "./#{@dst}".cyan + " in ".white + "#{"%.3f" % result[:rt]}s".yellow
       puts col("INFO", :cyan)     + "#{result[:count]}".yellow + " files / " + fsize.yellow
       FileUtils.mv(@d_bld, @d_dst)
       @d_dst

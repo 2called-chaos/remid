@@ -177,13 +177,13 @@ module Remid
         end
       end
 
-      commit_cbuf.tap do
-        # if Thread.current == Thread.main
-          Thread.current[:fparse_rbuf] = nil
-          Thread.current[:fparse_cbuf] = nil
-          Thread.current[:fparse_wbuf] = nil
-        # end
-      end
+      commit_cbuf
+    ensure
+      # if Thread.current == Thread.main
+        Thread.current[:fparse_rbuf] = nil
+        Thread.current[:fparse_cbuf] = nil
+        Thread.current[:fparse_wbuf] = nil
+      # end
     end
 
     def commit_cbuf
@@ -287,9 +287,11 @@ module Remid
           #to_eval << %q{    puts parent_thread[:fparse_cbuf].inspect }
           #to_eval << %q{    puts }
           to_eval << %q{    parent_thread[:fparse_cbuf] = parent_thread[:fparse_cbuf].concat fp.result_buffer.dup}
-          #to_eval << %q{    puts parent_thread[:fparse_cbuf].inspect }
+          to_eval << %q{    Thread.current[:result] = fp.result_buffer.join("\n") }
           to_eval << %q{    parent_thread[:fparse_wbuf] = parent_thread[:fparse_wbuf].concat fp.warnings}
-          to_eval << %q{  end.join}
+          to_eval << %q{  end}
+          to_eval << %q{  thr.join}
+          to_eval << %q{  thr[:result]}
           to_eval <<  %{#{@state.delete(:block_footer)}}
           eval(to_eval.join("\n"), a_binding)
         end.call

@@ -20,6 +20,7 @@ Gem::Specification.new do |spec|
 
   spec.add_dependency "activesupport", ">= 6.1"
   spec.add_dependency "rainbow"#, ">= 6.1"
+  spec.add_dependency "listen"#, ">= 6.1"
   spec.add_development_dependency "bundler"
   spec.add_development_dependency "rake"
   spec.add_development_dependency "pry"

@@ -7,7 +7,11 @@ module Remid
     end
 
     def to_s
-      [x, y, z].join(" ")
+      to_a.join(" ")
+    end
+
+    def to_a
+      [x, y, z]
     end
 
     def dupe
