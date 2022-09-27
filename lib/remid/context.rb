@@ -1,7 +1,7 @@
 module Remid
   class Context
     COL = 10
-    attr_reader :opts, :meta, :objectives, :scheduler, :functions, :blobs, :jsons, :parser, :on_load, :on_tick, :tag
+    attr_reader :opts, :meta, :objectives, :scheduler, :functions, :anonymous_functions, :blobs, :jsons, :parser, :on_load, :on_tick, :tag
     attr_accessor :function_namespace, :scoreboard_namespace, :relative_target
 
     def initialize
@@ -11,6 +11,7 @@ module Remid
         autofix_trailing_commas: false,
       })
       @functions = {}
+      @anonymous_functions = {}
       @blobs = {}
       @jsons = {}
       @meta = OpenStruct.new(version: 10, description: "An undescribed datapack by an unknown author")
@@ -51,11 +52,25 @@ module Remid
       @objectives.namespace || raise("remid.rb must define a scoreboard_namespace")
     end
 
-    def __remid_register_function fnc, payload, src = nil
+    def __remid_register_function fnc, payload, src = nil, **kw
       _fnc = fnc.to_s
       raise "duplicate function error #{_fnc}" if @functions[_fnc]
       raise "expected string, got #{payload.class}" unless payload.is_a?(String)
-      @functions[_fnc] = FunctionParser.new(self, payload, src)
+      @functions[_fnc] = FunctionParser.new(self, _fnc, payload, src, **kw)#.tap(&:result_buffer)
+    end
+
+    def __remid_register_anonymous_function fkey, payload
+      with_fkey = @anonymous_functions.select {|_fnc, _| _fnc.start_with?("#{fkey}_") }
+      same_with_fkey = with_fkey.detect {|_, _payload| payload == _payload }
+
+      if same_with_fkey
+        # reuse existing, identical anonymous function
+        same_with_fkey[0]
+      else
+        "#{fkey}_#{with_fkey.length + 1}".tap do |fnc|
+          @anonymous_functions[fnc] = payload
+        end
+      end
     end
 
     def get_binding
@@ -82,6 +97,7 @@ module Remid
       __remid_serialize_tags(data_path, result, &exporter)
       __remid_serialize_jsons(data_path, result, &exporter)
       __remid_serialize_functions(data_path, result, &exporter)
+      __remid_serialize_anonymous_functions(data_path, result, &exporter)
       __remid_serialize_blobs(data_path, result, &exporter)
 
       result
@@ -138,6 +154,13 @@ module Remid
       @functions.each do |rel_file, data|
         result[:count] += 1
         result[:size] += yield(:function, data_path.join(@function_namespace, "functions", Pathname.new("#{rel_file}.mcfunction")), data, data.warnings).size
+      end
+    end
+
+    def __remid_serialize_anonymous_functions data_path, result
+      @anonymous_functions.each do |rel_file, data|
+        result[:count] += 1
+        result[:size] += yield(:anonymous_function, data_path.join(@function_namespace, "functions", Pathname.new("#{rel_file}.mcfunction")), data, []).size
       end
     end
 

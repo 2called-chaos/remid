@@ -129,6 +129,9 @@ module Remid
           puts col(file_or_data.warnings.empty? ? "#" : "WARN #", file_or_data.warnings.empty? ? :green : :yellow) + "./" + rel_file.to_s
           print_serialization_warnings(warnings)
           File.open(@d_bld.join(rel_file), "wb") {|f| f.write(file_or_data.as_string) }
+        when :anonymous_function
+          puts col("#", :green) + "./" + rel_file.to_s
+          File.open(@d_bld.join(rel_file), "wb") {|f| f.write(file_or_data) }
         else
           raise "don't know how to serialize #{type}"
         end

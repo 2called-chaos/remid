@@ -27,7 +27,7 @@ module Remid
   end
 
   class FunctionParser
-    attr_reader :warnings, :payload, :context, :cbuf
+    attr_reader :warnings, :payload, :context, :cbuf, :fname
 
     SPACES = [" ", "\t"].freeze
     ENCLOSERS = ["[", "]", "{", "}"].freeze
@@ -40,16 +40,20 @@ module Remid
     T_BLOCK_CLOSE = "#~]".freeze
     T_COMMENT = "#".freeze
     T_GT = ">".freeze
-    T_BANG = ">".freeze
+    T_DOUBLE_GT = ">>".freeze
+    T_TRIPLE_GT = ">>>".freeze
+    T_BANG = "!".freeze
     T_GT_BANG = ">!".freeze
     T_GTEQ = ">=".freeze
     T_LT = "<".freeze
+    T_DOUBLE_LT = "<<".freeze
+    T_TRIPLE_LT = "<<<".freeze
     T_LTEQ = "<=".freeze
     T_SLASH = "/".freeze
     T_BACKSLASH = "\\".freeze
     T_NSSEP = ":".freeze
 
-    def initialize context, payload, src, a_binding = nil, skip_indent: 0, li_offset: 0
+    def initialize context, fname, payload, src, a_binding = nil, skip_indent: 0, li_offset: 0
       @context = context
       @payload = payload
       @a_binding = a_binding # || get_binding
@@ -58,6 +62,7 @@ module Remid
       if rt && @src.to_s.start_with?(rt)
         @rsrc = Pathname.new("." << @rsrc.to_s[rt.length..-1])
       end
+      @fname = fname
       @warnings = []
       @indent_per_level = 1
       @skip_indent = skip_indent
@@ -133,6 +138,16 @@ module Remid
         @state[:scoped_indent] += 1 if @state[:indent_increased]
         @state[:scoped_indent] -= 1 if @state[:indent_decreased]
 
+        if @state[:in_anonymous] && !(@line.peek(T_TRIPLE_GT.length) == T_TRIPLE_GT && @state[:indent] == 0)
+          @state[:anon_buffer] << @raw_line
+          next
+        end
+
+        if @state[:in_ral] && !(@line.peek(T_DOUBLE_GT.length) == T_DOUBLE_GT && @state[:indent] == 0)
+          @state[:ral_buffer] << @raw_line
+          next
+        end
+
         if @state[:block_indent] != 0
           if @line.peek(T_BLOCK_OPEN.length) == T_BLOCK_OPEN
             @state[:block_indent] += 1
@@ -162,6 +177,10 @@ module Remid
           _l_block_close
         elsif @line.peek(1) == T_COMMENT
           _l_comment
+        elsif @line.readif(T_TRIPLE_GT)
+          _l_anon_close
+        elsif @line.readif(T_DOUBLE_GT)
+          _l_ral_close
         elsif @line.readif(T_GT_BANG)
           _l_scoreboard_op_helper
         elsif @line.readif(T_GT)
@@ -174,6 +193,12 @@ module Remid
           else
             @cbuf.last << T_SPACE << process_interpolations(@line.read)
           end
+
+          # anonymous functions
+          _i_anon_open if @cbuf.last&.end_with?(T_TRIPLE_LT)
+
+          # repeat-a-line
+          _i_ral_open if @cbuf.last&.end_with?(T_DOUBLE_LT)
         end
       end
 
@@ -216,6 +241,103 @@ module Remid
       @rbuf
     end
 
+    def _execute_sub input_buffer, header: nil, footer: nil, concat: true, concat_warnings: nil
+      concat_warnings = concat if concat_warnings.nil?
+      proc do
+        a_binding = binding
+        a_binding.local_variable_set(:a_context, @context)
+        a_binding.local_variable_set(:a_src, @src)
+        a_binding.local_variable_set(:a_fname, @fname)
+        a_binding.local_variable_set(:a_buffer, input_buffer)
+        a_binding.local_variable_set(:a_li_offset, @li_no - input_buffer.length - (header ? 1 : 0))
+        a_binding.local_variable_set(:a_skip_indent, @skip_indent + 1)
+        a_binding.local_variable_set(:x_binding, @a_binding)
+
+        to_eval = []
+        to_eval << %q{parent_thread = Thread.current}
+        to_eval <<  %{#{header}} if header
+        to_eval << %q{  s_binding = binding}
+        to_eval << %q{  if x_binding}
+        to_eval << %q{    (x_binding.local_variables - s_binding.local_variables).each do |x|}
+        to_eval << %q{      s_binding.local_variable_set(x, x_binding.local_variable_get(x))}
+        to_eval << %q{    end}
+        to_eval << %q{  end}
+        #to_eval << %q{  parent_thread = Thread.main unless parent_thread[:fparse_cbuf]}
+        to_eval << %q{  thr = Thread.new do}
+        to_eval << %q{    fp = FunctionParser.new(a_context, a_fname, a_buffer.join("\n"), a_src, s_binding, skip_indent: a_skip_indent, li_offset: a_li_offset)}
+        #to_eval << %q{    puts ">----------------------"}
+        #to_eval << %q{    puts a_buffer.inspect}
+        #to_eval << %q{    puts "=---------------------"}
+        #to_eval << %q{    puts fp.result_buffer.inspect}
+        #to_eval << %q{    puts "<---------------------"}
+        #to_eval << %q{    puts }
+        #to_eval << %q{    puts }
+        #to_eval << %q{    puts parent_thread == Thread.main }
+        #to_eval << %q{    puts parent_thread[:fparse_cbuf].inspect }
+        #to_eval << %q{    puts }
+        to_eval << %q{    parent_thread[:fparse_cbuf] = parent_thread[:fparse_cbuf].concat fp.result_buffer.dup} if concat
+        to_eval << %q{    parent_thread[:fparse_wbuf] = parent_thread[:fparse_wbuf].concat fp.warnings} if concat_warnings
+        to_eval << %q{    Thread.current[:result] = fp.result_buffer.join("\n") }
+        to_eval << %q{  end}
+        to_eval << %q{  thr.join}
+        to_eval << %q{  thr[:result]}
+        to_eval <<  %{#{footer}} if footer
+        eval(to_eval.join("\n"), a_binding)
+      end.call
+    end
+
+    def _i_anon_open
+      @state[:in_anonymous] = true
+      @state[:anon_entry] = @cbuf.pop.delete_suffix(T_TRIPLE_LT)
+      @state[:anon_lino] = @li_no
+      @state[:anon_buffer] = []
+    end
+
+    def _i_ral_open
+      @state[:in_ral] = true
+      @state[:ral_entry] = @cbuf.pop.delete_suffix(T_DOUBLE_LT)
+      @state[:ral_buffer] = []
+    end
+
+    def _l_ral_close
+      @state.delete(:in_ral)
+
+      if @state[:ral_buffer].empty?
+        @state.delete(:ral_buffer)
+        @state.delete(:ral_entry)
+        return
+      end
+
+      a_entry = @state.delete(:ral_entry)
+      a_buffer = @state.delete(:ral_buffer)
+      xout = _execute_sub(a_buffer, concat: false, concat_warnings: true)
+      xout.split("\n").each do |l|
+        if l.blank?
+          @cbuf << l
+        else
+          @cbuf << (a_entry + l)
+        end
+      end
+    end
+
+    def _l_anon_close
+      @state.delete(:in_anonymous)
+
+      if @state[:anon_buffer].empty?
+        @state.delete(:anon_buffer)
+        @state.delete(:anon_entry)
+        return
+      end
+
+      a_entry = @state.delete(:anon_entry)
+      a_buffer = @state.delete(:anon_buffer)
+      a_lino = @state.delete(:anon_lino)
+      fkey = "#{@fname}/__anon_#{a_lino}"
+      xout = _execute_sub(a_buffer, concat: false)
+      fnc = @context.__remid_register_anonymous_function(fkey, xout)
+      @cbuf << a_entry + "function #{@context.function_namespace}:#{fnc}"
+    end
+
     def _l_eval append: false
       @line.read_while(SPACES) # padding
       eval_pos = @line.pos
@@ -251,50 +373,9 @@ module Remid
       if @state[:block_indent] == 0
         @state[:block_footer] = @line.read
 
-        proc do
-          a_binding = binding
-          a_binding.local_variable_set(:a_context, @context)
-          a_binding.local_variable_set(:a_src, @src)
-          a_binding.local_variable_set(:a_buffer, @state[:block_buffer].dup.freeze)
-          a_binding.local_variable_set(:a_li_offset, @li_no - @state[:block_buffer].length - 1) # -1 because header
-          a_binding.local_variable_set(:a_skip_indent, @skip_indent + 1)
-          a_binding.local_variable_set(:x_binding, @a_binding)
-          @state[:block_buffer].clear
-
-          to_eval = []
-          to_eval <<  %{#{@state.delete(:block_header)}}
-          #to_eval << %q{  puts "li:#{a_skip_indent}"}
-          #to_eval << %q{  puts "x:#{x rescue ??}"}
-          #to_eval << %q{  puts "y:#{y rescue ??}"}
-          to_eval << %q{  s_binding = binding}
-          to_eval << %q{  if x_binding}
-          to_eval << %q{    (x_binding.local_variables - s_binding.local_variables).each do |x|}
-          to_eval << %q{      s_binding.local_variable_set(x, x_binding.local_variable_get(x))}
-          to_eval << %q{    end}
-          to_eval << %q{  end}
-          to_eval << %q{  parent_thread = Thread.current}
-          #to_eval << %q{  parent_thread = Thread.main unless parent_thread[:fparse_cbuf]}
-          to_eval << %q{  thr = Thread.new do}
-          to_eval << %q{    fp = FunctionParser.new(a_context, a_buffer.join("\n"), a_src, s_binding, skip_indent: a_skip_indent, li_offset: a_li_offset)}
-          #to_eval << %q{    puts ">----------------------"}
-          #to_eval << %q{    puts a_buffer.inspect}
-          #to_eval << %q{    puts "=---------------------"}
-          #to_eval << %q{    puts fp.result_buffer.inspect}
-          #to_eval << %q{    puts "<---------------------"}
-          #to_eval << %q{    puts }
-          #to_eval << %q{    puts }
-          #to_eval << %q{    puts parent_thread == Thread.main }
-          #to_eval << %q{    puts parent_thread[:fparse_cbuf].inspect }
-          #to_eval << %q{    puts }
-          to_eval << %q{    parent_thread[:fparse_cbuf] = parent_thread[:fparse_cbuf].concat fp.result_buffer.dup}
-          to_eval << %q{    Thread.current[:result] = fp.result_buffer.join("\n") }
-          to_eval << %q{    parent_thread[:fparse_wbuf] = parent_thread[:fparse_wbuf].concat fp.warnings}
-          to_eval << %q{  end}
-          to_eval << %q{  thr.join}
-          to_eval << %q{  thr[:result]}
-          to_eval <<  %{#{@state.delete(:block_footer)}}
-          eval(to_eval.join("\n"), a_binding)
-        end.call
+        a_buffer = @state[:block_buffer].dup.freeze
+        @state[:block_buffer].clear
+        _execute_sub(a_buffer, header: @state.delete(:block_header), footer: @state.delete(:block_footer))
       end
     end
 
