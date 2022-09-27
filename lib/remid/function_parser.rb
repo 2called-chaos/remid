@@ -178,7 +178,7 @@ module Remid
           _l_block_open
         elsif @line.readif(T_BLOCK_CLOSE)
           _l_block_close
-        elsif @line.peek(1) == T_COMMENT
+        elsif @line.peek(1) == T_COMMENT && @line.peek(2) != "#\{"
           _l_comment
         elsif @line.readif(T_TRIPLE_GT)
           _l_anon_close
