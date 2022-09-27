@@ -31,6 +31,15 @@ execute as @e[tag=expensive_selector] at @s run <<<
 >>>
 
 
+# Scheduling anonymous functions is not yet sugar-ified. You can do it like this but the scheduler won't know
+# that this function has been scheduled (when you use cancel_all, see frameworkish_stuff).
+# If you have an idea for a syntax for this let me know, I thought about ending with ">>> @ 10t" like
+# the function helper works but I'm not convinced yet.
+execute as @s run schedule <<<
+	say one second later
+>>>
+	1s
+
 
 
 
