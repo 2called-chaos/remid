@@ -16,6 +16,8 @@ REMID is a "transpiler" or more like a Frankenstein monster of a code generator 
 
 and creates a vanilla datapack out of all that. REMID should be 100% vanilla compatible so you can start using it any time you want and incrementally use any feature you desire.
 
+REMID is currently developed on Windows but it should work on Linux and macOS.
+
 ---
 
 ## Disclaimer
