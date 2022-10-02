@@ -136,12 +136,10 @@ module Remid
           case v
           when Array
             case v.first
-            when Float
-              sdat << "#{k}:[#{v.map{|_v| "#{_v}f" }.join(", ")}]"
-            when Integer
-              sdat << "#{k}:[#{v.map{|_v| "#{_v}" }.join(", ")}]"
-            else
+            when Symbol
               sdat << "#{k}:#{v.map(&:to_s)}"
+            else
+              sdat << "#{k}:#{v}"
             end
           when TrueClass, FalseClass
             sdat << "#{k}:#{v ? "1b" : "0b"}"
@@ -176,10 +174,10 @@ module Remid
 
       def facing_rot
         {
-          north: [-180.0, 0.0],
-          east:  [-90.0, 0.0],
-          south: [0.0, 0.0],
-          west:  [90.0, 0.0],
+          north: [Remid::Float.new(-180.0), Remid::Float.new(0.0)],
+          east:  [Remid::Float.new(-90.0), Remid::Float.new(0.0)],
+          south: [Remid::Float.new(0.0), Remid::Float.new(0.0)],
+          west:  [Remid::Float.new(90.0), Remid::Float.new(0.0)],
         }.freeze[@opts[:direction]]
       end
 

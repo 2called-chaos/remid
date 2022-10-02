@@ -35,6 +35,7 @@ require "rainbow/refinement"
 
 # application
 require "remid/version"
+require "remid/types"
 require "remid/application"
 require "remid/source_directory"
 require "remid/context"
