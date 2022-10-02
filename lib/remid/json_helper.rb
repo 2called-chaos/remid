@@ -47,6 +47,7 @@ module Remid
 
       def to_s
         r = []
+        r << '""' if @extras.any?
         if (@opts.keys - [:merge_on_self]).empty?
           r << %{"#{@string}"}
         else
