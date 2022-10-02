@@ -47,4 +47,6 @@ require "remid/team_manager"
 require "remid/team"
 require "remid/json_helper"
 
+require "remid/entity"
 require "remid/coord"
+require "remid/written_book"
