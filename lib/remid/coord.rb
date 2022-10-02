@@ -23,6 +23,18 @@ module Remid
       { x: x, y: y, z: z }
     end
 
+    def * _t
+      _t.times.map{ to_s }.join(" ")
+    end
+
+    def setblock block
+      if block.is_a?(Hash)
+        "fill #{to_s} #{to_s} #{block.values.first} replace #{block.keys.first}"
+      else
+        "setblock #{to_s} #{block}"
+      end
+    end
+
     def dupe
       Coord.new(x, y, z)
     end

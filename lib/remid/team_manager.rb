@@ -1,15 +1,15 @@
 module Remid
-  class ObjectiveManager < Hash
+  class TeamManager < Hash
     attr_accessor :namespace
 
     def initialize parent
       @parent = parent
     end
 
-    def add key, type = "dummy", **kw
-      rkey = key.is_a?(Symbol) ? "#{@namespace}_#{key}" : key
-      raise "duplicate objective error #{rkey} already taken" if self[rkey]
-      self[rkey] = Objective.new(self, rkey, type, **kw)
+    def add key, **kw
+      rkey = key.is_a?(Symbol) ? "#{@parent.function_namespace}_#{key}" : key
+      raise "duplicate team error #{rkey} already taken" if self[rkey]
+      self[rkey] = Team.new(self, rkey, **kw)
     end
 
     def create_all cbuf: nil
@@ -34,7 +34,7 @@ module Remid
 
     def method_missing meth, *args, **kwargs, &block
       if args.empty? && kwargs.empty?
-        self[meth.to_s] || self["#{@namespace}_#{meth}"] || super
+        self[meth.to_s] || self["#{@parent.function_namespace}_#{meth}"] || super
       else
         super
       end

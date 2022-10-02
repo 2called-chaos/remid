@@ -9,8 +9,7 @@ module Remid
     end
 
     def create cbuf: nil
-      cbuf ||= Thread.current[:fparse_cbuf]
-      raise "no context" unless cbuf
+      cbuf = $remid.buf(cbuf)
       cmd = "scoreboard objectives add #{@key} #{@type}"
       cmd << " \"#{@opts[:name]}\"" if @opts[:name]
       cbuf << cmd
@@ -25,9 +24,11 @@ module Remid
     end
 
     def destroy cbuf: nil
-      cbuf ||= Thread.current[:fparse_cbuf]
-      raise "no context" unless cbuf
-      cbuf << "scoreboard objectives remove #{@key}"
+      $remid.buf(cbuf) << "scoreboard objectives remove #{@key}"
+    end
+
+    def to_s
+      @key.to_s
     end
   end
 end

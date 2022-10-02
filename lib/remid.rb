@@ -2,6 +2,21 @@ module Remid
   #ROOT = File.expand_path("../..", __FILE__)
 end
 
+module Kernel
+  def load_relative *paths
+    dir = Pathname.new(caller.first).dirname
+    paths.each do |path|
+      xpath = dir.join(path)
+      if FileTest.file?("#{xpath}.rb")
+        load dir.join("#{xpath}.rb")
+      else
+        load dir.join(xpath)
+      end
+    end
+    true
+  end
+end
+
 # stdlib
 require "benchmark"
 require "fileutils"
@@ -28,4 +43,8 @@ require "remid/function_parser"
 require "remid/tag_manager"
 require "remid/objective_manager"
 require "remid/objective"
+require "remid/team_manager"
+require "remid/team"
+require "remid/json_helper"
+
 require "remid/coord"

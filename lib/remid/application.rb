@@ -145,13 +145,23 @@ module Remid
     end
 
     def watch_source_directory
-      return if @listener
-      @listener = Listen.to(@sd.d_src, wait_for_delay: 1) do |modified, added, removed|
-        @pending << @sd
-        #puts(modified: modified, added: added, removed: removed)
+      return if @listeners
+      @listeners = ([@sd.d_src] + @sd.context.watch).map do |dir|
+        if dir.is_a?(Array)
+          xdir = dir
+          xopts = xdir.extract_options!
+          xopts[:wait_for_delay] = 1 unless xopts.key?(:wait_for_delay)
+          Listen.to(*xdir, **xopts) { @pending << @sd }
+        elsif dir.is_a?(Pathname) && dir.file?
+          Listen.to(dir.dirname, only: Regexp.new(Regexp.escape(dir.basename.to_s)), wait_for_delay: 1) { @pending << @sd }
+        else
+          Listen.to(dir, wait_for_delay: 1) { @pending << @sd }
+        end
       end
+
+      @listeners.push Listen.to(@sd.dir, wait_for_delay: 1, only: /remid\.rb/) { @pending << @sd }
       #puts @sd.col("WATCHING", :magenta) + "#{@sd.d_src}".cyan
-      @listener.start
+      @listeners.each(&:start)
     end
   end
 end

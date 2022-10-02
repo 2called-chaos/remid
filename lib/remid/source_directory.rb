@@ -13,6 +13,10 @@ module Remid
       @d_bld = @dir.join(".build")
       @d_dst = @dir.join(@dst)
       @d_dstp = @dir.join("#{@dst}.prev")
+
+      $remid = @context = Context.new(self)
+      @context.relative_target = @dir
+      @context.__remid_load_manifest(@dir.join("remid.rb"))
     end
 
     def col name = "", color = :black
@@ -21,19 +25,17 @@ module Remid
 
     def compile! build_no: nil
       puts col("COMPILING", :yellow) + @dir.to_s.magenta
+      $remid = @context = Context.new(self)
+      @context.relative_target = @dir
+      @context.__remid_load_manifest(@dir.join("remid.rb"))
       return unless ensure_source
 
       result = nil
       rt = Benchmark.realtime {
-        # create context
-        $remid = @context = context = Context.new
-        $remid.relative_target = @dir
-        $remid.__remid_load_manifest(@dir.join("remid.rb"))
-
         create_build_directoy
-        collect_source_files(context)
+        collect_source_files(@context)
         puts col("WRITING", :yellow) + "writing pack data"
-        result = serialize_context(context)
+        result = serialize_context(@context)
       }
       result[:rt] = rt
       finally_move_build(result, build_no: build_no)

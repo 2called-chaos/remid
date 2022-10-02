@@ -2,24 +2,39 @@ module Remid
   class Context
     COL = 10
     attr_reader :opts, :meta, :objectives, :scheduler, :functions, :anonymous_functions, :blobs, :jsons, :parser, :on_load, :on_tick, :tag
-    attr_accessor :function_namespace, :scoreboard_namespace, :relative_target
+    attr_accessor :function_namespace, :scoreboard_namespace, :relative_target, :teams
 
-    def initialize
+    def initialize sd
+      @sd = sd
       @opts = OpenStruct.new({
         mcmeta: true,
         pretty_json: true,
         autofix_trailing_commas: false,
       })
+      @uuid = 0
       @functions = {}
       @anonymous_functions = {}
       @blobs = {}
       @jsons = {}
+      @watch = []
       @meta = OpenStruct.new(pack_format: 10, description: "An undescribed datapack by an unknown author")
       @scheduler = FunctionScheduler.new(self)
       @objectives = ObjectiveManager.new(self)
+      @teams = TeamManager.new(self)
       @tag = TagManager.new(self)
       @on_load = [:__remid_auto]
       @on_tick = [:__remid_auto]
+    end
+
+    def uuid
+      @uuid += 1
+      @uuid
+    end
+
+    def buf cbuf = nil
+      cbuf ||= Thread.current[:fparse_cbuf]
+      raise "no context" unless cbuf
+      cbuf
     end
 
     def on_load= value
@@ -44,6 +59,17 @@ module Remid
       else
         @on_tick = []
       end
+    end
+
+    def watch *paths
+      paths.each do |path|
+        if path.is_a?(String) && path.start_with?("./")
+          @watch << @sd.dir.join(path)
+        else
+          @watch << path
+        end
+      end
+      @watch
     end
 
     def __remid_load_manifest file

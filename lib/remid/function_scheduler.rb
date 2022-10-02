@@ -22,7 +22,7 @@ module Remid
       if which == :scheduled
         cbuf << proc {|cbuf|
           @scheduled.each do |name|
-            cbuf << "actually schedule clear #{name}"
+            cbuf << "schedule clear #{name}"
           end
         }
       elsif which == :functions

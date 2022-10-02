@@ -232,7 +232,7 @@ module Remid
       old_rbuf.each do |rbe|
         if rbe.is_a?(Proc)
           rbe.call(tmpcbuf = [])
-          tmpcbuf = tmpcbuf.reverse
+          # tmpcbuf = tmpcbuf.reverse
           @rbuf << tmpcbuf.shift while tmpcbuf.length > 0
         else
           @rbuf << rbe
