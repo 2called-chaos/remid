@@ -87,7 +87,7 @@ module Remid
 
     def __remid_register_anonymous_function fkey, payload
       with_fkey = @anonymous_functions.select {|_fnc, _| _fnc.start_with?("#{fkey}_") }
-      same_with_fkey = with_fkey.detect {|_, _payload| payload == _payload }
+      same_with_fkey = with_fkey.detect {|_, _payload| payload.result_buffer == _payload.result_buffer }
 
       if same_with_fkey
         # reuse existing, identical anonymous function
@@ -115,7 +115,7 @@ module Remid
 
     def __remid_serialize &exporter
       data_path = Pathname.new("data")
-      result = { count: 0, size: 0 }
+      result = { count: 0, size: 0, warnings: 0 }
 
       __remid_serialize_mcmeta(data_path, result, &exporter)
       __remid_serialize_remid_auto(data_path, result, :load, &exporter)
@@ -154,6 +154,7 @@ module Remid
           lfunc
         end
 
+        result[:warnings] += fwarns.length
         result[:count] += 1
         result[:size] += yield(:json, data_path.join("minecraft/tags/functions/#{fname}.json"), { values: scoped_fcol }, fwarns).size
       end
@@ -187,6 +188,7 @@ module Remid
 
       @functions.each do |rel_file, data|
         data.finalize_buffer!
+        result[:warnings] += data.warnings.length
         result[:count] += 1
         result[:size] += yield(:function, data_path.join(@function_namespace, "functions", Pathname.new("#{rel_file}.mcfunction")), data, data.warnings).size
       end
@@ -194,8 +196,18 @@ module Remid
 
     def __remid_serialize_anonymous_functions data_path, result
       @anonymous_functions.each do |rel_file, data|
+        begin
+          data.result_buffer # pre-parse for warnings and exceptions
+        rescue Exception => ex
+          data.exception = ex
+        end
+      end
+
+      @anonymous_functions.each do |rel_file, data|
+        data.finalize_buffer!
+        result[:warnings] += data.warnings.length
         result[:count] += 1
-        result[:size] += yield(:anonymous_function, data_path.join(@function_namespace, "functions", Pathname.new("#{rel_file}.mcfunction")), data, []).size
+        result[:size] += yield(:anonymous_function, data_path.join(@function_namespace, "functions", Pathname.new("#{rel_file}.mcfunction")), data, data.warnings).size
       end
     end
 

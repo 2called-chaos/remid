@@ -254,7 +254,7 @@ module Remid
       end
     end
 
-    def _execute_sub input_buffer, header: nil, footer: nil, concat: true, concat_warnings: nil
+    def _execute_sub input_buffer, header: nil, footer: nil, concat: true, concat_warnings: nil, finalize: false, as_func: false
       concat_warnings = concat if concat_warnings.nil?
       proc do
         a_binding = binding
@@ -265,6 +265,8 @@ module Remid
         a_binding.local_variable_set(:a_li_offset, @li_no - input_buffer.length - (header ? 1 : 0) - 1)
         a_binding.local_variable_set(:a_skip_indent, @skip_indent + 1)
         a_binding.local_variable_set(:x_binding, @a_binding)
+        a_binding.local_variable_set(:a_finalize_buffer, finalize)
+        a_binding.local_variable_set(:a_as_func, as_func)
 
         to_eval = []
         to_eval << %q{parent_thread = Thread.current}
@@ -290,7 +292,9 @@ module Remid
         #to_eval << %q{    puts }
         to_eval << %q{    parent_thread[:fparse_cbuf] = parent_thread[:fparse_cbuf].concat fp.result_buffer.dup} if concat
         to_eval << %q{    parent_thread[:fparse_wbuf] = parent_thread[:fparse_wbuf].concat fp.warnings} if concat_warnings
-        to_eval << %q{    Thread.current[:result] = fp.result_buffer.join("\n") }
+        to_eval << %q{    fp.result_buffer } unless concat
+        to_eval << %q{    fp.finalize_buffer! if a_finalize_buffer }
+        to_eval << %q{    Thread.current[:result] = a_as_func ? fp : fp.result_buffer.join("\n") }
         to_eval << %q{  end}
         to_eval << %q{  thr.join}
         to_eval << %q{  thr[:result]}
@@ -327,7 +331,7 @@ module Remid
 
       a_entry = @state.delete(:ral_entry)
       a_buffer = @state.delete(:ral_buffer)
-      xout = _execute_sub(a_buffer, concat: false, concat_warnings: true)
+      xout = _execute_sub(a_buffer, concat: false, concat_warnings: true, finalize: true)
       xout.split("\n").each do |l|
         if l.blank?
           @cbuf << l
@@ -353,7 +357,7 @@ module Remid
       a_buffer = @state.delete(:anon_buffer)
       a_lino = @state.delete(:anon_lino)
       fkey = "#{@fname}/__anon_#{a_lino}"
-      xout = _execute_sub(a_buffer, concat: false)
+      xout = _execute_sub(a_buffer, concat: false, as_func: true)
       fnc = @context.__remid_register_anonymous_function(fkey, xout)
       @cbuf << a_entry + "function #{@context.function_namespace}:#{fnc}"
     end

@@ -121,7 +121,7 @@ module Remid
           puts col("*", :silver) + "./" + rel_file.to_s
           print_serialization_warnings(warnings)
           File.open(@d_bld.join(rel_file), "wb") {|f| f.write(ctx.opts.pretty_json ? JSON.pretty_generate(file_or_data) : JSON.generate(file_or_data)) }
-        when :function
+        when :function, :anonymous_function
           if file_or_data.exception
             puts col("ERROR #", :red) + "./" + rel_file.to_s
             raise(file_or_data.exception)
@@ -129,9 +129,9 @@ module Remid
           puts col(warnings.empty? ? "#" : "WARN #", warnings.empty? ? :green : :yellow) + "./" + rel_file.to_s
           print_serialization_warnings(warnings)
           File.open(@d_bld.join(rel_file), "wb") {|f| f.write(file_or_data.as_string) }
-        when :anonymous_function
-          puts col("#", :green) + "./" + rel_file.to_s
-          File.open(@d_bld.join(rel_file), "wb") {|f| f.write(file_or_data) }
+        # when :anonymous_function
+        #   puts col("#", :green) + "./" + rel_file.to_s
+        #   File.open(@d_bld.join(rel_file), "wb") {|f| f.write(file_or_data) }
         else
           raise "don't know how to serialize #{type}"
         end
@@ -161,6 +161,9 @@ module Remid
       fsize = result[:size] > 1024 * 1024 ? "#{"%.2f" % (result[:size].to_f / (1024 * 1024))}MB" : "#{"%.2f" % (result[:size].to_f / (1024))}KB"
       puts col("SUCCESS", :green) + "Build#{"[##{build_no}]" if build_no} successfully to ".white + "./#{@dst}".cyan + " in ".white + "#{"%.3f" % result[:rt]}s".yellow
       puts col("INFO", :cyan)     + "#{result[:count]}".yellow + " files / " + fsize.yellow
+      if result[:warnings] > 0
+        puts col("WARN", :yellow)     + "#{result[:warnings]} warnings".red
+      end
       FileUtils.mv(@d_bld, @d_dst)
       @d_dst
     end
