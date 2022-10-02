@@ -2,17 +2,18 @@ module Remid
   class Coord
     attr_accessor :x, :y, :z
 
-    def initialize(x, y, z)
+    def initialize(x, y, z, relative: false)
+      @relative = relative
       @x, @y, @z = x, y, z
       @original_position = to_a
     end
 
     def original_position
-      Coord.new(*@original_position)
+      Coord.new(*@original_position, relative: @relative)
     end
 
     def to_s
-      to_a.join(" ")
+      @relative ? to_a.map{|v| v.zero? ? "~" : "~#{v}" }.join(" ") : to_a.join(" ")
     end
 
     def to_a
@@ -36,7 +37,7 @@ module Remid
     end
 
     def dupe
-      Coord.new(x, y, z)
+      Coord.new(x, y, z, relative: @relative)
     end
 
     def delta
@@ -52,6 +53,10 @@ module Remid
         @z = @original_position[2] if axis.include?(:z)
       end
       self
+    end
+
+    def execute
+      "execute positioned #{to_s}"
     end
 
     def dupe!
