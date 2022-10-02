@@ -63,6 +63,17 @@ module Remid
       dupe.tap{|c| c.instance_variable_set(:"@original_position", @original_position) }
     end
 
+    def invert
+      dupe.invert!
+    end
+
+    def invert!
+      self.x *= -1
+      self.y *= -1
+      self.z *= -1
+      self
+    end
+
     def move(*args, **kw)
       self.x += kw[:x] || args[0] || 0
       self.y += kw[:y] || args[1] || 0
