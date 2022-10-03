@@ -80,6 +80,15 @@ module Remid
       end
     end
 
+    def anonymous_function
+      buf = []
+      yield(buf)
+      fkey = "#{@fname}/__anon_#{@li_no}"
+      xout = _execute_sub(buf, concat: false, as_func: true)
+      fnc = @context.__remid_register_anonymous_function(fkey, xout)
+      "#{@context.function_namespace}:#{fnc}"
+    end
+
     def parse
       raise "concurrent parse error" if Thread.current[:fparse_rbuf]
       @li_no = @li_offset
@@ -570,7 +579,7 @@ module Remid
         fsched = fsched[2..-1].strip if append
       end
 
-      if fcall.start_with?("#{@context.function_namespace}:") && !@context.functions[fcall.split(":")[1]]
+      if fcall.start_with?("#{@context.function_namespace}:") && !(@context.functions[fcall.split(":")[1]] || @context.anonymous_functions[fcall.split(":")[1]])
         @warnings << "calling undefined function `#{fcall}' in #{@rsrc}:#{@li_no}"
       end
 
