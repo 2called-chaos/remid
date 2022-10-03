@@ -12,6 +12,28 @@ module Remid
       Coord.new(*@original_position, relative: @relative)
     end
 
+    def to_sel *axis
+      axis = [:x, :y, :z] if axis.empty?
+      axis.map do |axe|
+        "#{axe}=#{send(axe)}"
+      end.join(",")
+    end
+
+    def to_dim *axis
+      axis = [:x, :y, :z] if axis.empty?
+      axis.map do |axe|
+        "d#{axe}=#{send(axe)}"
+      end.join(",")
+    end
+
+    def min coord
+      at([x, coord.x].min, [y, coord.y].min, [z, coord.z].min)
+    end
+
+    def max coord
+      at([x, coord.x].max, [y, coord.y].max, [z, coord.z].max)
+    end
+
     def to_s
       @relative ? to_a.map{|v| v.zero? ? "~" : "~#{v}" }.join(" ") : to_a.join(" ")
     end
@@ -40,8 +62,14 @@ module Remid
       Coord.new(x, y, z, relative: @relative)
     end
 
-    def delta
-      Coord.new(*to_a.map.with_index{|cv, ci| (@original_position[ci] - cv).abs })
+    def delta d_to
+      if d_to.is_a?(Coord)
+        Coord.new(*to_a.map.with_index{|cv, ci| (d_to.to_a[ci] - cv).abs })
+      elsif d_to
+        Coord.new(*to_a.map.with_index{|cv, ci| (d_to[ci] - cv).abs })
+      else
+        Coord.new(*to_a.map.with_index{|cv, ci| (@original_position[ci] - cv).abs })
+      end
     end
 
     def reset *axis
