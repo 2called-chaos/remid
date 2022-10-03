@@ -515,7 +515,7 @@ module Remid
     end
 
     def resolve_scoreboard_instruct instruct
-      if m = instruct.match(/^([^\s]+)\s+([^\s]+)\s+(=|\+=|\-=)\s+(\d+)$/i)
+      if m = instruct.match(/^([^\s]+)\s+([^\s]+)\s+(=|\+=|\-=)\s+([\-\+\d]+)$/i)
         # > $objective $player = VAL
         # > $objective $player += VAL
         # > $objective $player -= VAL
