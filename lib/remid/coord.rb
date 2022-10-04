@@ -1,11 +1,35 @@
 module Remid
   class Coord
-    attr_accessor :x, :y, :z
+    def self.rel *args, **kwargs
+      args << 0 while args.length < 3
+      args[0] = kwargs[:x] if kwargs.key?(:x)
+      args[1] = kwargs[:y] if kwargs.key?(:y)
+      args[2] = kwargs[:z] if kwargs.key?(:z)
+      new(*args, relative: true)
+    end
+    attr_reader :x, :y, :z
 
     def initialize(x, y, z, relative: false)
       @relative = relative
+      @frozen = false
       @x, @y, @z = x, y, z
       @original_position = to_a
+    end
+
+    def frozen?
+      @frozen
+    end
+
+    def freeze
+      @frozen = true
+      self
+    end
+
+    [:x, :y, :z].each do |axe|
+      define_method(:"#{axe}=") do |val|
+        raise(FrozenError, "cannot modify frozen Remid::Coord") if frozen?
+        instance_variable_set(:"@#{axe}", val)
+      end
     end
 
     def original_position
@@ -76,9 +100,9 @@ module Remid
       if axis.empty?
         set(*@original_position)
       else
-        @x = @original_position[0] if axis.include?(:x)
-        @y = @original_position[1] if axis.include?(:y)
-        @z = @original_position[2] if axis.include?(:z)
+        self.x = @original_position[0] if axis.include?(:x)
+        self.y = @original_position[1] if axis.include?(:y)
+        self.z = @original_position[2] if axis.include?(:z)
       end
       self
     end
