@@ -1,7 +1,7 @@
 module Remid
   class Context
     COL = 10
-    attr_reader :opts, :meta, :objectives, :scheduler, :functions, :anonymous_functions, :blobs, :jsons, :parser, :on_load, :on_tick, :tag
+    attr_reader :opts, :vectors, :meta, :objectives, :scheduler, :functions, :anonymous_functions, :blobs, :jsons, :parser, :on_load, :on_tick, :tag
     attr_accessor :function_namespace, :scoreboard_namespace, :relative_target, :teams
 
     def initialize sd
@@ -24,6 +24,21 @@ module Remid
       @tag = TagManager.new(self)
       @on_load = [:__remid_auto]
       @on_tick = [:__remid_auto]
+
+      @vectors = OpenStruct.new()
+      @vectors.direction = {
+        north: Coord.new(0, 0, -1, relative: true).freeze,
+        east:  Coord.new(1, 0, 0, relative: true).freeze,
+        south: Coord.new(0, 0, 1, relative: true).freeze,
+        west:  Coord.new(-1, 0, 0, relative: true).freeze,
+      }.freeze
+
+      @vectors.rotation = {
+        north: AngleGroup.new(-180.0, 0.0).deep_freeze,
+        east:  AngleGroup.new(-90.0, 0.0).deep_freeze,
+        south: AngleGroup.new(0.0, 0.0).deep_freeze,
+        west:  AngleGroup.new(90.0, 0.0).deep_freeze,
+      }.freeze
     end
 
     def uuid
