@@ -26,13 +26,6 @@ module Remid
       __class.instance_method(method.to_sym).bind(self)
     end
 
-    # Support: call a method with the maximum possible amount of arguments but
-    # be warned: it's a dirty hack because ruby's arity handling just sucks.
-    def __call_method_like_proc method, *args, &block
-      method = __method(method) if method.is_a?(::Symbol) || method.is_a?(::String)
-      ::Banana::Kernel.__call_method_like_proc(method, *args, &block)
-    end
-
     # Get the proxy meta class
     def self.__metaclass__
       class << self; self; end
@@ -58,14 +51,30 @@ module Remid
 
     protected
 
-    def initialize target, *args, &block
+    def initialize target, *args, **kwargs, &block
       @target = target
-      __call_method_like_proc(:__setup, *args, &block) if __class.__respond_to?(:__setup)
+      __setup(*args, **kwargs, &block) if __class.__respond_to?(:__setup)
     end
 
     # send all method calls to the target
     def method_missing(name, *args, &block)
       @target.__send__(name, *args, &block)
+    end
+  end
+
+  class FreezableProxy < Proxy
+    def initialize *args, **kwargs, &block
+      @frozen = false
+      super
+    end
+
+    def frozen?
+      @frozen
+    end
+
+    def freeze
+      @frozen = true
+      self
     end
   end
 
@@ -75,7 +84,102 @@ module Remid
     end
 
     def inspect
+      to_s
+    end
+  end
+
+  class Angle < FreezableProxy
+    def to_s
       "#{@target}f"
+    end
+
+    def inspect
+      to_s
+    end
+
+    def dupe
+      Angle.new(@target)
+    end
+
+    [:invert, :right, :left].each do |meth|
+      define_method(meth) do |*args, **kwargs|
+        Angle.new(@target).send(:"#{meth}!", *args, **kwargs)
+      end
+    end
+
+    def invert!
+      raise "cannot modify frozen Remid::Angle" if frozen?
+      right(180)
+      self
+    end
+
+    def right! ang
+      raise "cannot modify frozen Remid::Angle" if frozen?
+      @target = (@target + ang) % 360
+      self
+    end
+
+    def left! ang
+      raise "cannot modify frozen Remid::Angle" if frozen?
+      right(-ang)
+      self
+    end
+  end
+
+  class AngleGroup < FreezableProxy
+    def initialize(*angles)
+      @target = angles.map{|ang| Angle.new(ang) }
+    end
+
+    def freeze
+      super
+      @target.freeze
+    end
+
+    def deep_freeze
+      @target.each(&:freeze)
+      freeze
+    end
+
+    [:invert, :left, :right].each do |meth|
+      define_method(meth) do |*args, **kwargs|
+        @target.map{|v| v.send(meth, *args, **kwargs) }
+      end
+      define_method(:"#{meth}!") do |*args, **kwargs|
+        raise "cannot modify frozen Remid::Angle" if frozen?
+        @target = @target.map{|v| v.dupe.send(meth, *args, **kwargs) }
+      end
+    end
+  end
+
+  class NbtHash < Proxy
+    def self.kv_to_str k, v
+      case v
+      when ::Array
+        case v.first
+        when ::Symbol
+          "#{k}:#{v.map(&:to_s)}"
+        else
+          "#{k}:#{v}"
+        end
+      when ::TrueClass, ::FalseClass
+        "#{k}:#{v ? "1b" : "0b"}"
+      else
+        "#{k}:#{v.inspect}"
+      end
+    end
+
+    def self.h_to_str h
+      r = h.map {|k, v| kv_to_str(k, v) }
+      "{#{r.join(", ")}}"
+    end
+
+    def to_s
+      NbtHash.h_to_str(@target)
+    end
+
+    def inspect
+      to_s
     end
   end
 end

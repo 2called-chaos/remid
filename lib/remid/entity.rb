@@ -49,42 +49,37 @@ module Remid
       end
 
       def gravity yesno = true
-        if yesno
-          data_del(:NoGravity)
-        else
-          data_set(:NoGravity, true)
-        end
+        yesno ? data_del(:NoGravity) : data_set(:NoGravity, true)
       end
 
       def ai yesno = true
-        if yesno
-          data_del(:NoAI)
-        else
-          data_set(:NoAI, true)
-        end
+        yesno ? data_del(:NoAI) : data_set(:NoAI, true)
       end
 
       def invulnerable yesno = true
-        if yesno
-          data_set(:Invulnerable, true)
-        else
-          data_del(:Invulnerable)
-        end
+        yesno ? data_set(:Invulnerable, true) : data_del(:Invulnerable)
       end
 
       def silent yesno = true
-        if yesno
-          data_set(:Silent, true)
-        else
-          data_del(:Silent)
-        end
+        yesno ? data_set(:Silent, true) : data_del(:Silent)
       end
 
       def persist yesno = true
-        if yesno
-          data_set(:PersistenceRequired, true)
+        yesno ? data_set(:PersistenceRequired, true) : data_del(:PersistenceRequired)
+      end
+
+      def marker yesno = true
+        yesno ? data_set(:Marker, true) : data_del(:Marker)
+      end
+
+      def rotate pitch = nil, yaw = nil
+        if !pitch && !yaw
+          data_del(:Rotation)
         else
-          data_del(:PersistenceRequired)
+          crot = @data[:Rotation] || [0, 0]
+          crot[0] = pitch if pitch
+          crot[1] = yaw if yaw
+          data_set(:Rotation, crot)
         end
       end
 
@@ -133,19 +128,7 @@ module Remid
 
         sdat << "Tags:#{tags.map(&:to_s)}"
         _data.each do |k, v|
-          case v
-          when Array
-            case v.first
-            when Symbol
-              sdat << "#{k}:#{v.map(&:to_s)}"
-            else
-              sdat << "#{k}:#{v}"
-            end
-          when TrueClass, FalseClass
-            sdat << "#{k}:#{v ? "1b" : "0b"}"
-          else
-            sdat << "#{k}:#{v.inspect}"
-          end
+          sdat << NbtHash.kv_to_str(k, v)
         end
 
         "{#{sdat.join(",")}}"
@@ -190,11 +173,11 @@ module Remid
       end
 
       def create
-        cbuf << "summon #{entity.type} #{pos} #{nbt_string}"
+        cbuf << summon
       end
 
       def summon
-        create
+        "summon #{entity.type} #{pos} #{nbt_string}"
       end
 
       def kill
