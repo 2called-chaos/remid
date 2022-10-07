@@ -60,6 +60,10 @@ module Remid
         yesno ? data_set(:Invulnerable, true) : data_del(:Invulnerable)
       end
 
+      def invisible yesno = true
+        yesno ? data_set(:Invisible, true) : data_del(:Invisible)
+      end
+
       def silent yesno = true
         yesno ? data_set(:Silent, true) : data_del(:Silent)
       end
@@ -69,7 +73,16 @@ module Remid
       end
 
       def marker yesno = true
-        yesno ? data_set(:Marker, true) : data_del(:Marker)
+        if yesno
+          data_set(:Marker, true)
+          baseplate(false)
+        else
+          data_del(:Marker)
+        end
+      end
+
+      def baseplate yesno = true
+        yesno ? data_del(:NoBasePlate) : data_set(:NoBasePlate, true)
       end
 
       def rotate pitch = nil, yaw = nil
@@ -92,7 +105,7 @@ module Remid
       # ---------------
       # --- INVERTS ---
       # ---------------
-      [:ai, :gravity, :loot, :persist, :persisted, :silent].each do |meth|
+      [:ai, :gravity, :loot, :persist, :persisted, :silent, :baseplate].each do |meth|
         define_method(:"no#{meth}") do |yesno = true|
           send(meth, !yesno)
         end
