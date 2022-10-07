@@ -10,6 +10,7 @@ module Remid
         mcmeta: true,
         pretty_json: true,
         autofix_trailing_commas: false,
+        function_book: true,
       })
       @uuid = 0
       @functions = {}
@@ -131,6 +132,10 @@ module Remid
     def __remid_serialize &exporter
       data_path = Pathname.new("data")
       result = { count: 0, size: 0, warnings: 0 }
+
+      if @opts[:function_book]
+        @functions["__remid/fnbook"] = Remid::FunctionBook.new(self)
+      end
 
       __remid_serialize_mcmeta(data_path, result, &exporter)
       __remid_serialize_remid_auto(data_path, result, :load, &exporter)

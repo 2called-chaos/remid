@@ -89,6 +89,14 @@ module Remid
       "#{@context.function_namespace}:#{fnc}"
     end
 
+    def result_buffer
+      @result_buffer ||= parse
+    end
+
+    def as_string
+      result_buffer.join("\n")
+    end
+
     def parse
       raise "concurrent parse error" if Thread.current[:fparse_rbuf]
       @li_no = @li_offset
@@ -107,6 +115,7 @@ module Remid
 
       buf = payload.split("\n", -1)
 
+      Thread.current[:fparse_inst] = self
       Thread.current[:fparse_rbuf] = @rbuf
       Thread.current[:fparse_cbuf] = @cbuf
       Thread.current[:fparse_wbuf] = @warnings
@@ -222,6 +231,7 @@ module Remid
       commit_cbuf
     ensure
       # if Thread.current == Thread.main
+        Thread.current[:fparse_inst] = nil
         Thread.current[:fparse_rbuf] = nil
         Thread.current[:fparse_cbuf] = nil
         Thread.current[:fparse_wbuf] = nil
@@ -511,91 +521,86 @@ module Remid
       raise "#{ex.class}: #{ex.message} in #{@rsrc}:#{@li_no}"
     end
 
-    def resolve_objective str
-      if str.start_with?("/")
-        str[1..-1]
-      else
-        scoped_key = "#{@context.scoreboard_namespace}_#{str}"
-        unless @context.objectives[scoped_key]
-          @warnings << "referencing undefined scoreboard objective `#{scoped_key}' in #{@rsrc}:#{@li_no}"
+    module Resolvers
+      def resolve_objective str
+        if str.start_with?("/")
+          str[1..-1]
+        else
+          scoped_key = "#{@context.scoreboard_namespace}_#{str}"
+          unless @context.objectives[scoped_key]
+            @warnings << "referencing undefined scoreboard objective `#{scoped_key}' in #{@rsrc}:#{@li_no}"
+          end
+          scoped_key
         end
-        scoped_key
       end
-    end
 
-    def resolve_scoreboard_instruct instruct
-      if m = instruct.match(/^([^\s]+)\s+([^\s]+)\s+(=|\+=|\-=)\s+([\-\+\d]+)$/i)
-        # > $objective $player = VAL
-        # > $objective $player += VAL
-        # > $objective $player -= VAL
-        case m[3]
-        when "="
-          "scoreboard players set #{m[2]} #{resolve_objective(m[1])} #{m[4]}"
-        when "+="
-          "scoreboard players add #{m[2]} #{resolve_objective(m[1])} #{m[4]}"
-        when "-="
-          "scoreboard players remove #{m[2]} #{resolve_objective(m[1])} #{m[4]}"
+      def resolve_scoreboard_instruct instruct
+        if m = instruct.match(/^([^\s]+)\s+([^\s]+)\s+(=|\+=|\-=)\s+([\-\+\d]+)$/i)
+          # > $objective $player = VAL
+          # > $objective $player += VAL
+          # > $objective $player -= VAL
+          case m[3]
+          when "="
+            "scoreboard players set #{m[2]} #{resolve_objective(m[1])} #{m[4]}"
+          when "+="
+            "scoreboard players add #{m[2]} #{resolve_objective(m[1])} #{m[4]}"
+          when "-="
+            "scoreboard players remove #{m[2]} #{resolve_objective(m[1])} #{m[4]}"
+          end
+        elsif m = instruct.match(/^([^\s]+)\s+([^\s]+)\s+(reset|enable)$/i)
+          # > $objective $player reset
+          # > $objective $player enable
+          "scoreboard players #{m[3]} #{m[2]} #{resolve_objective(m[1])}"
+        elsif m = instruct.match(/^([^\s]+)\s+([^\s]+)\s+(\+\+|\-\-)$/i)
+          # > $objective $player ++
+          # > $objective $player --
+          case m[3]
+          when "++"
+            "scoreboard players add #{m[2]} #{resolve_objective(m[1])} 1"
+          when "--"
+            "scoreboard players remove #{m[2]} #{resolve_objective(m[1])} 1"
+          end
+        elsif m = instruct.match(/^([^\s]+)\s+([^\s]+)$/i)
+          # > $objective $player
+          "scoreboard players get #{m[2]} #{resolve_objective(m[1])}"
+        elsif m = instruct.match(/^([^\s]+)$/i)
+          # > $objective
+          resolve_objective(m[1])
+        else
+          raise "did not understand scoreboard instruction: `#{instruct}'"
         end
-      elsif m = instruct.match(/^([^\s]+)\s+([^\s]+)\s+(reset|enable)$/i)
-        # > $objective $player reset
-        # > $objective $player enable
-        "scoreboard players #{m[3]} #{m[2]} #{resolve_objective(m[1])}"
-      elsif m = instruct.match(/^([^\s]+)\s+([^\s]+)\s+(\+\+|\-\-)$/i)
-        # > $objective $player ++
-        # > $objective $player --
-        case m[3]
-        when "++"
-          "scoreboard players add #{m[2]} #{resolve_objective(m[1])} 1"
-        when "--"
-          "scoreboard players remove #{m[2]} #{resolve_objective(m[1])} 1"
+      end
+
+      def resolve_scoreboard_op_instruct instruct
+        if m = instruct.match(/^([^\s]+)\s+([^\s]+)\s+(=|\+=|\-=|\*=|\/=|%=|><|<|>)\s+([^\s]+)$/i)
+          "scoreboard players operation #{m[2]} #{resolve_objective(m[1])} #{m[3]} #{m[4]} #{resolve_objective(m[1])}"
+        elsif m = instruct.match(/^([^\s]+)\s+([^\s]+)\s+(=|\+=|\-=|\*=|\/=|%=|><|<|>)\s+([^\s]+)\s+([^\s]+)$/i)
+          "scoreboard players operation #{m[2]} #{resolve_objective(m[1])} #{m[3]} #{m[5]} #{resolve_objective(m[4])}"
+        else
+          raise "did not understand scoreboard-operation instruction: `#{instruct}'"
         end
-      elsif m = instruct.match(/^([^\s]+)\s+([^\s]+)$/i)
-        # > $objective $player
-        "scoreboard players get #{m[2]} #{resolve_objective(m[1])}"
-      elsif m = instruct.match(/^([^\s]+)$/i)
-        # > $objective
-        resolve_objective(m[1])
-      else
-        raise "did not understand scoreboard instruction: `#{instruct}'"
-      end
-    end
-
-    def resolve_scoreboard_op_instruct instruct
-      if m = instruct.match(/^([^\s]+)\s+([^\s]+)\s+(=|\+=|\-=|\*=|\/=|%=|><|<|>)\s+([^\s]+)$/i)
-        "scoreboard players operation #{m[2]} #{resolve_objective(m[1])} #{m[3]} #{m[4]} #{resolve_objective(m[1])}"
-      elsif m = instruct.match(/^([^\s]+)\s+([^\s]+)\s+(=|\+=|\-=|\*=|\/=|%=|><|<|>)\s+([^\s]+)\s+([^\s]+)$/i)
-        "scoreboard players operation #{m[2]} #{resolve_objective(m[1])} #{m[3]} #{m[5]} #{resolve_objective(m[4])}"
-      else
-        raise "did not understand scoreboard-operation instruction: `#{instruct}'"
-      end
-    end
-
-    def resolve_fcall fcall
-      fcall = "#{@context.function_namespace}:#{fcall}" unless fcall[T_NSSEP]
-
-      if fcall["@"]
-        fcall, fsched = fcall.split("@").map(&:strip)
-        append = fsched.start_with?("<<")
-        fsched = fsched[2..-1].strip if append
       end
 
-      if fcall.start_with?("#{@context.function_namespace}:") && !(@context.functions[fcall.split(":")[1]] || @context.anonymous_functions[fcall.split(":")[1]])
-        @warnings << "calling undefined function `#{fcall}' in #{@rsrc}:#{@li_no}"
+      def resolve_fcall fcall
+        fcall = "#{@context.function_namespace}:#{fcall}" unless fcall[T_NSSEP]
+
+        if fcall["@"]
+          fcall, fsched = fcall.split("@").map(&:strip)
+          append = fsched.start_with?("<<")
+          fsched = fsched[2..-1].strip if append
+        end
+
+        if fcall.start_with?("#{@context.function_namespace}:") && !(@context.functions[fcall.split(":")[1]] || @context.anonymous_functions[fcall.split(":")[1]])
+          @warnings << "calling undefined function `#{fcall}' in #{@rsrc}:#{@li_no}"
+        end
+
+        if fsched
+          $remid.scheduler.schedule(fcall, fsched, append: append)
+        else
+          "function #{fcall}"
+        end
       end
-
-      if fsched
-        $remid.scheduler.schedule(fcall, fsched, append: append)
-      else
-        "function #{fcall}"
-      end
     end
-
-    def result_buffer
-      @result_buffer ||= parse
-    end
-
-    def as_string
-      result_buffer.join("\n")
-    end
+    include Resolvers
   end
 end

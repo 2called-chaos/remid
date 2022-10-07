@@ -47,7 +47,7 @@ module Remid
 
       def to_s
         r = []
-        r << '""' if @extras.any?
+        r << '{"text":""}' if @extras.any?
         if (@opts.keys - [:merge_on_self]).empty?
           r << %{"#{@string}"}
         else
@@ -61,8 +61,24 @@ module Remid
       end
       alias_method :to_str, :to_s
 
+      def finalize_delayed!
+        _finalize_delayed_recursive(@opts, @opts)
+        @extras.each(&:finalize_delayed!)
+      end
+
+      def _finalize_delayed_recursive _data, parent, key = nil
+        case _data
+        when Hash
+          _data.each {|k, v| _finalize_delayed_recursive(v, _data, k) }
+        when Array
+          _data.each {|v| _finalize_delayed_recursive(v, _data) }
+        when Proc
+          parent[key] = _data.call
+        end
+      end
+
       def method_missing method, *a, **kw, &b
-        puts "DELEGATING:#{method}:#{a}"
+        ::Kernel.puts "DELEGATING:#{method}:#{a}"
         @string.send(method, *a, **kw, &b)
       end
 
@@ -111,12 +127,47 @@ module Remid
       # Events
       def click farg = nil, **kw
         kw[:run] = farg if farg
-        merged(click: kw)
+
+        if kw.key?(:run) || kw.key?(:suggest)
+          cmd = kw[:run] || kw[:suggest]
+          if cmd.start_with?("/")
+            raise "cannot resolve functions without remid context" unless Thread.current[:fparse_inst]
+            cmd = Thread.current[:fparse_inst].resolve_fcall(cmd.delete_prefix("/"))
+          end
+          cmd = cmd.prepend("/")
+          merged(clickEvent: { action: (kw.key?(:run) ? "run_command" : "suggest_command"), value: cmd })
+        elsif kw.key?(:url)
+          url = kw[:url]
+          url = url.prepend("https://") unless url.start_with?("http")
+          merged(clickEvent: { action: "open_url", value: url })
+        elsif kw.key?(:copy)
+          merged(clickEvent: { action: "copy_to_clipboard", value: kw[:copy] })
+        elsif kw.key?(:page)
+          pl = kw[:page]
+          if pl.nil?
+            pl = 1
+          elsif !pl.is_a?(Numeric)
+            pl = proc {
+              book = Thread.current[:__book]
+              raise "failed to lookup page number without book context" unless book
+              (book.pages.index(kw[:page].to_sym) || 0) + 1
+            }
+          end
+          pl = 0 unless pl
+          merged(clickEvent: { action: "change_page", value: pl })
+        else
+          raise "unknown click type #{kw}"
+        end
       end
 
       def hover farg = nil, **kw
         kw[:text] = farg if farg
-        merged(hover: kw)
+
+        if kw.key?(:text)
+          merged(hoverEvent: { action: "show_text", value: kw[:text] })
+        else
+          raise "unknown hover type #{kw}"
+        end
       end
     end
 

@@ -7,7 +7,7 @@ module Remid
       def page name, &block
         @_pages ||= {}
         raise "page with name #{name} already exists" if @_pages[name]
-        @_pages[name] = Page.new(name, block)
+        @_pages[name] = Page.new(name, block, use_in_binding: true)
       end
 
       def title value = nil, &block
@@ -20,10 +20,25 @@ module Remid
     end
 
     def initialize *args, **kw, &block
-      @pages = self.class._pages&.dup || []
+      @pages = self.class._pages&.dup || {}
       @title = self.class._title || "Untitled Book"
       @author = self.class._author || "Unknown"
       init(*args, **kw, &block) if respond_to?(:init)
+    end
+
+    def page name, &block
+      @pages ||= {}
+      if block
+        raise "page with name #{name} already exists" if @pages[name]
+        @pages[name] = Page.new(name, block)
+      else
+        raise "page with name #{name} does not exist" unless @pages[name]
+        pages.index(name)
+      end
+    end
+
+    def all_pages
+      @pages
     end
 
     def pages
@@ -71,32 +86,40 @@ module Remid
     class Page
       attr_reader :__page, :book
 
-      def initialize(name, builder)
+      def initialize(name, builder, use_in_binding: false)
         @name = name
         @builder = builder
+        @use_in_binding = use_in_binding
         @__page = []
         @__scopes = [JsonHelper::PresentedMinecraftString.new("", merge_on_self: true)]
       end
 
-      def __render book
+      def __render_safe book
+        raise "concurrent render error" if Thread.current[:__book]
         @__page.clear
         @__page << ['""']
-        @book = book
-        @builder.binding.eval("using Remid::JsonHelper")
-        instance_eval(&@builder)
+        Thread.current[:__book] = @book = book
+        yield
         # @__page.pop if @__page.last.empty?
         @__page.delete_if(&:empty?)
         @__page
       ensure
-        @book = nil
+        Thread.current[:__book] = @book = nil
+      end
+
+      def __render book
+        __render_safe(book) do
+          @builder.binding.eval("using Remid::JsonHelper") if @use_in_binding
+          instance_eval(&@builder)
+        end
       end
 
       def puts *args
         args << nil if args.empty?
-        args = args.map{|v| v.nil? ? "" : v}
+        args = args.flatten.map{|v| v.nil? ? "" : v}
         args.each do |arg|
           print arg
-          __page << []
+          __page << ['"\\\n"']
         end
       end
 
