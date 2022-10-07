@@ -26,14 +26,7 @@ module Remid
       @on_load = [:__remid_auto]
       @on_tick = [:__remid_auto]
 
-      @vectors = OpenStruct.new()
-      @vectors.direction = {
-        north: Coord.new(0, 0, -1, relative: true).freeze,
-        east:  Coord.new(1, 0, 0, relative: true).freeze,
-        south: Coord.new(0, 0, 1, relative: true).freeze,
-        west:  Coord.new(-1, 0, 0, relative: true).freeze,
-      }.freeze
-
+      @vectors = OpenStruct.new(Coord::VECTORS)
       @vectors.rotation = {
         north: AngleGroup.new(-180.0, 0.0).deep_freeze,
         east:  AngleGroup.new(-90.0, 0.0).deep_freeze,

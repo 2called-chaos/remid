@@ -1,6 +1,9 @@
 module Remid
   class Coord
     def self.rel *args, **kwargs
+      if args.length == 1 && args.first.is_a?(Coord)
+        args = args.first.to_a
+      end
       args << 0 while args.length < 3
       args[0] = kwargs[:x] if kwargs.key?(:x)
       args[1] = kwargs[:y] if kwargs.key?(:y)
@@ -126,7 +129,20 @@ module Remid
       self
     end
 
+    def _prep_args args
+      if VECTORS[:direction].key?(args.first)
+        return VECTORS[:direction][args.first].mult(args.second).to_a
+      end
+
+      if args.length == 1 && args.first.is_a?(Coord)
+        return args.first.to_a
+      end
+
+      args
+    end
+
     def move(*args, **kw)
+      args = _prep_args(args)
       self.x += kw[:x] || args[0] || 0
       self.y += kw[:y] || args[1] || 0
       self.z += kw[:z] || args[2] || 0
@@ -134,6 +150,7 @@ module Remid
     end
 
     def set(*args, **kw)
+      args = _prep_args(args)
       self.x = kw[:x] || args[0] || @x
       self.y = kw[:y] || args[1] || @y
       self.z = kw[:z] || args[2] || @z
@@ -141,6 +158,7 @@ module Remid
     end
 
     def rel(*args, **kw)
+      args = _prep_args(args)
       copy = dupe
       copy.x += kw[:x] || args[0] || 0
       copy.y += kw[:y] || args[1] || 0
@@ -148,7 +166,21 @@ module Remid
       copy
     end
 
+    def mult! *xargs, **kw
+      args = _prep_args(xargs)
+      args << args.first while args.length < 3
+      self.x = self.x * (kw[:x] || args[0] || 1)
+      self.y = self.y * (kw[:y] || args[1] || 1)
+      self.z = self.z * (kw[:z] || args[2] || 1)
+      self
+    end
+
+    def mult *args, **kw
+      dupe.mult!(*args, **kw)
+    end
+
     def at(*args, **kw)
+      args = _prep_args(args)
       copy = dupe
       copy.x = kw[:x] || args[0] || @x
       copy.y = kw[:y] || args[1] || @y
@@ -161,7 +193,7 @@ module Remid
       yield.tap do
         to_a.each_with_index do |cv, ci|
           if before[ci] != cv
-            puts "setting ##{ci} from #{before[ci]} to #{cv} (o was #{@original_position[ci]})"
+            #puts "setting ##{ci} from #{before[ci]} to #{cv} (o was #{@original_position[ci]})"
             @original_position[ci] = cv
           end
         end
@@ -175,5 +207,15 @@ module Remid
     def set!(*args, **kw)
       _alter_original_if_axis_changed { set(*args, **kw) }
     end
+
+
+    VECTORS = {
+      direction: {
+        north: Coord.new(0, 0, -1, relative: true).freeze,
+        east:  Coord.new(1, 0, 0, relative: true).freeze,
+        south: Coord.new(0, 0, 1, relative: true).freeze,
+        west:  Coord.new(-1, 0, 0, relative: true).freeze,
+      }.freeze
+    }
   end
 end
