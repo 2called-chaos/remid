@@ -53,7 +53,8 @@ module Remid
 
     def _render_pages_for_sub top_level, children, state, scope = []
       sub_i = 1
-      all_keys = (top_level + children.keys).sort
+      all_keys = (top_level + children.keys.map{|k| k + "/" }).sort
+      @context.opts.function_book_filter&.call(all_keys, scope, state, children)
       total_pages = (all_keys.length.to_f / (LPP - 1).to_f).ceil
       _render_page_head(state, scope, sub_i, total_pages)
 
@@ -63,16 +64,14 @@ module Remid
           sub_i += 1
           _render_page_head(state, scope, sub_i, total_pages)
         end
-        if top_level.include?(fnc) && !(children.key?(fnc) && !state[:page_map]["#{fnc}/"])
+        if fnc.end_with?("/") #top_level.include?(fnc) && !(children.key?(fnc) && !state[:page_map]["#{fnc}/"])
+          sfnc = fnc.delete_suffix("/")
+          sx = "./#{fnc}".blue.hover("go to #{sfnc}").click(page: :"#{(scope + [sfnc]).join("/")}_1")
+          sx << " (#{children[sfnc].length})".gray
+          state[:lines] << sx
+        else
           sx = "./#{fnc}".light_purple.hover("run #{fnc}").click("/" + (scope + [fnc]).join("/"))
           state[:lines] << sx
-        elsif children.key?(fnc)
-          sx = "./#{fnc}/".blue.hover("go to #{fnc}").click(page: :"#{(scope + [fnc]).join("/")}_1")
-          sx << " (#{children[fnc].length})".gray
-          state[:lines] << sx
-          fnc = "#{fnc}/"
-        else
-          raise "how did we get here?!?"
         end
         state[:page_map][(scope + [fnc]).join("/")] = state[:page_no]
       end
