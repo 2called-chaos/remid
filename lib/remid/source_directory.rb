@@ -154,7 +154,15 @@ module Remid
       if @d_dst.exist?
         puts col("INFO", :cyan) + "moving " + "./#{@dst}".cyan + " to " + "./#{@dst}.prev".blue
         FileUtils.rm_rf(@d_dstp) if @d_dstp.exist?
-        FileUtils.mv(@d_dst, @d_dstp)
+        tries = 0
+        begin
+          FileUtils.mv(@d_dst, @d_dstp)
+        rescue Errno::EACCES, Errno::ENOENT
+          tries += 1
+          warn "Failed to move folders, retrying..."
+          sleep 1
+          tries < 5 ? retry : raise
+        end
       end
 
       # move finished build
