@@ -24,11 +24,9 @@ module Remid
       }
       _render_pages_for(functions.keys, state)
       state[:pages].each_with_index do |(pn, pg), i|
-        puts "initing #{pn}"
         page(pn) { puts pg }
       end
       state[:pages].each_with_index do |(pn, pg), i|
-        puts "rendering #{pn}"
         @pages[pn].__render_safe(self) do
           # resolve delayed calls (page resolve)
           pg.each do |li|
@@ -115,11 +113,15 @@ module Remid
     end
 
     def as_string
-      give("@s")
+      clear_books + "\n" + give("@s")
+    end
+
+    def clear_books
+      'clear @s minecraft:written_book{author:"Remid::FunctionBook"}'
     end
 
     def result_buffer
-      [as_string]
+      [clear_books, as_string]
     end
 
     def finalize_buffer!
