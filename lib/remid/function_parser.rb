@@ -39,6 +39,8 @@ module Remid
     T_EVAL_APPEND = "#~<".freeze
     T_BLOCK_OPEN = "#~[".freeze
     T_BLOCK_CLOSE = "#~]".freeze
+    T_SILENT_BLOCK_OPEN = "#~(".freeze
+    T_SILENT_BLOCK_CLOSE = "#~)".freeze
     T_COMMENT = "#".freeze
     T_GT = ">".freeze
     T_DOUBLE_GT = ">>".freeze
@@ -80,13 +82,53 @@ module Remid
       end
     end
 
-    def anonymous_function
-      buf = []
-      yield(buf)
+    def anonymous_function buf = nil, &block
+      buf ||= []
       fkey = "#{@fname}/__anon_#{@li_no}"
-      xout = _execute_sub(buf, concat: false, as_func: true)
-      fnc = @context.__remid_register_anonymous_function(fkey, xout)
+      if block
+        if block.arity == 1
+          block.call(buf)
+          xout = _execute_sub(buf, concat: false, as_func: true)
+          fnc = @context.__remid_register_anonymous_function(fkey, xout)
+        else
+          fnc = @context.__remid_register_unique_anonymous_function(fkey) do |_fnc|
+            block.call(buf, _fnc)
+            _execute_sub(buf, concat: false, as_func: true, fname: _fnc)
+          end
+        end
+      else
+        xout = _execute_sub(buf, concat: false, as_func: true)
+        fnc = @context.__remid_register_anonymous_function(fkey, xout)
+      end
       "#{@context.function_namespace}:#{fnc}"
+    end
+
+    def tick key, tick_rate, execute_on = 0, &block
+      @context.objectives.add :tick unless @context.objectives["tick"]
+      [].tap do |result|
+        animation_code = anonymous_function(block.call.split("\n"))
+        result << "> tick $#{key} += 0"
+        result << "execute if score $#{key} \#{> tick} matches #{execute_on} run \#{/#{animation_code}}"
+        result << "> tick $#{key} += 1"
+        result << "execute if score $#{key} \#{> tick} matches #{execute_on} run \#{/#{animation_code}}" if tick_rate && tick_rate == execute_on
+        result << "execute if score $#{key} \#{> tick} matches #{tick_rate}.. run \#{> tick $#{key} = 0}" if tick_rate
+      end.reverse.each {|line| @ibuf.unshift(line) }
+    end
+
+    def raycast target: "@p", steps: 50, success:, failure: nil
+      @context.objectives.add :ray_step unless @context.objectives["ray_step"]
+      ray_step = anonymous_function{|aout, self_ref|
+        aout << "execute unless block ~ ~ ~ minecraft:air run \#{/#{success}}" if success
+        aout << "execute unless block ~ ~ ~ minecraft:air run \#{> ray_step @s = 0}"
+        aout << "> ray_step @s -= 1"
+        aout << "execute if score @s \#{> ray_step} matches 0 positioned ^ ^ ^0.1 run \#{/#{failure}}" if failure
+        aout << "execute if score @s \#{> ray_step} matches 1.. positioned ^ ^ ^0.1 run \#{/#{self_ref}}"
+      }
+      ray_start = anonymous_function{|aout|
+        aout << "> ray_step @s = #{steps}"
+        aout << "/#{ray_step}"
+      }
+      "execute as #{target} at @s anchored eyes positioned ^ ^ ^ anchored feet run #{resolve_fcall ray_start}"
     end
 
     def result_buffer
@@ -113,14 +155,14 @@ module Remid
       @state[:block_footer] = nil
       @state[:in_eval_block] = false
 
-      buf = payload.split("\n", -1)
+      @ibuf = payload.split("\n", -1)
 
       Thread.current[:fparse_inst] = self
       Thread.current[:fparse_rbuf] = @rbuf
       Thread.current[:fparse_cbuf] = @cbuf
       Thread.current[:fparse_wbuf] = @warnings
 
-      while raw_line = buf.shift
+      while raw_line = @ibuf.shift
         @li_no += 1
         @raw_line = raw_line
         @line = SeekableStringIO.new(@raw_line)
@@ -170,15 +212,15 @@ module Remid
         end
 
         if @state[:block_indent] != 0
-          if @line.peek(T_BLOCK_OPEN.length) == T_BLOCK_OPEN
+          if @line.peek(T_BLOCK_OPEN.length) == T_BLOCK_OPEN || @line.peek(T_SILENT_BLOCK_OPEN.length) == T_SILENT_BLOCK_OPEN
             @state[:block_indent] += 1
             @state[:block_buffer] << @raw_line
             next
-          elsif @line.peek(T_BLOCK_CLOSE.length) == T_BLOCK_CLOSE && @state[:block_indent] > 1
+          elsif (@line.peek(T_BLOCK_CLOSE.length) == T_BLOCK_CLOSE || @line.peek(T_SILENT_BLOCK_CLOSE.length) == T_SILENT_BLOCK_CLOSE) && @state[:block_indent] > 1
             @state[:block_indent] -= 1
             @state[:block_buffer] << @raw_line
             next
-          elsif !(@line.peek(T_BLOCK_CLOSE.length) == T_BLOCK_CLOSE)
+          elsif !(@line.peek(T_BLOCK_CLOSE.length) == T_BLOCK_CLOSE || @line.peek(T_SILENT_BLOCK_CLOSE.length) == T_SILENT_BLOCK_CLOSE)
             @state[:block_buffer] << @raw_line
             next
           end
@@ -195,8 +237,12 @@ module Remid
           _l_eval
         elsif @line.readif(T_BLOCK_OPEN)
           _l_block_open
+        elsif @line.readif(T_SILENT_BLOCK_OPEN)
+          _l_block_open(true)
         elsif @line.readif(T_BLOCK_CLOSE)
           _l_block_close
+        elsif @line.readif(T_SILENT_BLOCK_CLOSE)
+          _l_block_close(true)
         elsif @line.peek(1) == T_COMMENT && @line.peek(2) != "#\{"
           _l_comment
         elsif @line.readif(T_TRIPLE_GT)
@@ -273,13 +319,13 @@ module Remid
       end
     end
 
-    def _execute_sub input_buffer, header: nil, footer: nil, concat: true, concat_warnings: nil, finalize: false, as_func: false
+    def _execute_sub input_buffer, header: nil, footer: nil, concat: true, concat_warnings: nil, finalize: false, as_func: false, fname: nil
       concat_warnings = concat if concat_warnings.nil?
       proc do
         a_binding = binding
         a_binding.local_variable_set(:a_context, @context)
         a_binding.local_variable_set(:a_src, @src)
-        a_binding.local_variable_set(:a_fname, @fname)
+        a_binding.local_variable_set(:a_fname, fname || @fname)
         a_binding.local_variable_set(:a_buffer, input_buffer)
         a_binding.local_variable_set(:a_li_offset, @li_no - input_buffer.length - (header ? 1 : 0) - 1)
         a_binding.local_variable_set(:a_skip_indent, @skip_indent + 1)
@@ -404,7 +450,7 @@ module Remid
       end
     end
 
-    def _l_block_open
+    def _l_block_open silent = false
       @line.read_while(SPACES) # padding
       # collect till end, evaluate and add to rbuf
       @state[:block_indent] += 1
@@ -415,9 +461,9 @@ module Remid
       end
     end
 
-    def _l_block_close
+    def _l_block_close silent = false
       if @state[:block_indent] == 0
-        raise "unexcepected T_BLOCK_CLOSE #{T_BLOCK_CLOSE} in #{@rsrc}:#{@li_no}"
+        raise "unexcepected T_BLOCK_CLOSE #{T_BLOCK_CLOSE} or T_SILENT_BLOCK_CLOSE #{T_SILENT_BLOCK_CLOSE} in #{@rsrc}:#{@li_no}"
       end
       @line.read_while(SPACES) # padding
       #puts "close #{@state[:block_indent]}"
@@ -429,7 +475,7 @@ module Remid
 
         a_buffer = @state[:block_buffer].dup.freeze
         @state[:block_buffer].clear
-        _execute_sub(a_buffer, header: @state.delete(:block_header), footer: @state.delete(:block_footer))
+        _execute_sub(a_buffer, header: @state.delete(:block_header), footer: @state.delete(:block_footer), concat: !silent)
       end
     end
 
@@ -590,6 +636,23 @@ module Remid
       end
 
       def resolve_fcall fcall
+        if fcall == "::self"
+          fcall = @fname
+        end
+
+        scope = @fname.to_s.split("/")
+        scope.pop while scope.last&.start_with?("__anon")
+        scope.pop
+        # puts "#{fcall.inspect} #{scope}"
+        while fcall.start_with?("../")
+          scope.pop
+          fcall = fcall[3..-1]
+        end
+
+        if fcall.start_with?("./")
+          fcall = "#{scope.join("/")}/#{fcall[2..-1]}"
+        end
+
         fcall = "#{@context.function_namespace}:#{fcall}" unless fcall[T_NSSEP]
 
         if fcall["@"]
@@ -598,7 +661,8 @@ module Remid
           fsched = fsched[2..-1].strip if append
         end
 
-        if fcall.start_with?("#{@context.function_namespace}:") && !(@context.functions[fcall.split(":")[1]] || @context.anonymous_functions[fcall.split(":")[1]])
+        is_self = "#{@context.function_namespace}:#{@fname}" == fcall
+        if fcall.start_with?("#{@context.function_namespace}:") && !is_self && !(@context.functions[fcall.split(":")[1]] || @context.anonymous_functions[fcall.split(":")[1]])
           @warnings << "calling undefined function `#{fcall}' in #{@rsrc}:#{@li_no}"
         end
 

@@ -108,6 +108,13 @@ module Remid
       end
     end
 
+    def __remid_register_unique_anonymous_function fkey
+      with_fkey = @anonymous_functions.select {|_fnc, _| _fnc.start_with?("#{fkey}_") }
+      "#{fkey}_#{with_fkey.length + 1}".tap do |fnc|
+        @anonymous_functions[fnc] = yield(fnc)
+      end
+    end
+
     def get_binding
       binding
     end
