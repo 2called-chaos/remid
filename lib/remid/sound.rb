@@ -1,7 +1,7 @@
 module Remid
   class Sound
-    def initialize(file)
-      @context = Context.new(self, file: file)
+    def initialize(file, _data = {})
+      @context = Context.new(self, { file: file }.merge(_data))
     end
 
     class Context
