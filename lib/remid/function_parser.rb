@@ -287,6 +287,13 @@ module Remid
         a_binding.local_variable_set(:a_finalize_buffer, finalize)
         a_binding.local_variable_set(:a_as_func, as_func)
 
+        # copy missing local variables for nested blocks
+        if @a_binding
+          (@a_binding.local_variables - a_binding.local_variables).each do |lv|
+            a_binding.local_variable_set(lv, @a_binding.local_variable_get(lv))
+          end
+        end
+
         to_eval = []
         to_eval << %q{parent_thread = Thread.current}
         to_eval <<  %{#{header}} if header
@@ -318,6 +325,7 @@ module Remid
         to_eval << %q{  thr.join}
         to_eval << %q{  thr[:result]}
         to_eval <<  %{#{footer}} if footer
+
         eval(to_eval.join("\n"), a_binding)
       end.call
     end
