@@ -73,6 +73,21 @@ module Remid
       { x: x, y: y, z: z }
     end
 
+    def distance coord
+      Math.sqrt(distance_to_squared(coord))
+    end
+
+    def distance_to_squared coord
+      dx = self.x - coord.x
+      dy = self.y - coord.y
+      dz = self.z - coord.z
+      dx * dx + dy * dy + dz * dz
+    end
+
+    def manhattan_distance corrd
+      (self.x - coord.x).abs + (self.y - coord.y).abs + (self.z - coord.z).abs
+    end
+
     def * _t
       _t.times.map{ to_s }.join(" ")
     end
@@ -90,12 +105,16 @@ module Remid
     end
 
     def delta d_to
+      diff(d_to).abs!
+    end
+
+    def diff d_to
       if d_to.is_a?(Coord)
-        Coord.new(*to_a.map.with_index{|cv, ci| (d_to.to_a[ci] - cv).abs })
+        Coord.new(*to_a.map.with_index{|cv, ci| d_to.to_a[ci] - cv })
       elsif d_to
-        Coord.new(*to_a.map.with_index{|cv, ci| (d_to[ci] - cv).abs })
+        Coord.new(*to_a.map.with_index{|cv, ci| d_to[ci] - cv })
       else
-        Coord.new(*to_a.map.with_index{|cv, ci| (@original_position[ci] - cv).abs })
+        Coord.new(*to_a.map.with_index{|cv, ci| @original_position[ci] - cv })
       end
     end
 
@@ -139,6 +158,17 @@ module Remid
       end
 
       args
+    end
+
+    def abs
+      dupe.abs!
+    end
+
+    def abs!
+      self.x = self.x.abs
+      self.y = self.y.abs
+      self.z = self.z.abs
+      self
     end
 
     def move(*args, **kw)
