@@ -100,6 +100,15 @@ module Remid
         persist(*a)
       end
 
+      def tag *add_tags
+        @tags.push(*add_tags)
+        self
+      end
+
+      def untag *remove_tags
+        remove_tags.each {|_t| @tags.delete(_t) }
+        self
+      end
 
 
       # ---------------
