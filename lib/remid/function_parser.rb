@@ -32,6 +32,7 @@ module Remid
 
     ParseError = Class.new(::RuntimeError)
     ResolveError = Class.new(ParseError)
+    FunctionResolveError = Class.new(ResolveError)
 
     SPACES = [" ", "\t"].freeze
     ENCLOSERS = ["[", "]", "{", "}"].freeze
@@ -642,22 +643,30 @@ module Remid
         end
       end
 
-      def resolve_fcall fcall
+      def resolve_fcall _fcall
+        fcall = _fcall
         if fcall == "::self"
           fcall = @fname
         end
 
         scope = @fname.to_s.split("/")
         scope.pop while scope.last&.start_with?("__anon")
+        _scope = scope.dup
         scope.pop
+        was_relative = false
         # puts "#{fcall.inspect} #{scope}"
         while fcall.start_with?("../")
+          was_relative = true
+          if scope.empty?
+            raise FunctionResolveError, "Encountered ../ when already in root scope, was resolving `#{_fcall}' in `#{_scope}' with `#{fcall}' remaining in #{@rsrc}:#{@li_no}"
+          end
           scope.pop
           fcall = fcall[3..-1]
         end
 
-        if fcall.start_with?("./")
-          fcall = "#{scope.join("/")}/#{fcall[2..-1]}"
+        if fcall.start_with?("./") || was_relative
+          fcall = fcall[2..-1] if fcall.start_with?("./")
+          fcall = "#{scope.join("/")}/#{fcall}".delete_prefix("/")
         end
 
         fcall = "#{@context.function_namespace}:#{fcall}" unless fcall[T_NSSEP]
