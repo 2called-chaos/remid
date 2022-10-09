@@ -115,14 +115,14 @@ module Remid
       end.reverse.each {|line| @ibuf.unshift(line) }
     end
 
-    def raycast target: "@p", steps: 50, success:, failure: nil
+    def raycast target: "@p", steps: 50, step: 0.1, success:, failure: nil
       @context.objectives.add :ray_step unless @context.objectives["ray_step"]
       ray_step = anonymous_function{|aout, self_ref|
         aout << "execute unless block ~ ~ ~ minecraft:air run \#{/#{success}}" if success
         aout << "execute unless block ~ ~ ~ minecraft:air run \#{> ray_step @s = 0}"
         aout << "> ray_step @s -= 1"
-        aout << "execute if score @s \#{> ray_step} matches 0 positioned ^ ^ ^0.1 run \#{/#{failure}}" if failure
-        aout << "execute if score @s \#{> ray_step} matches 1.. positioned ^ ^ ^0.1 run \#{/#{self_ref}}"
+        aout << "execute if score @s \#{> ray_step} matches 0 positioned ^ ^ ^#{"%.2f" % step} run \#{/#{failure}}" if failure
+        aout << "execute if score @s \#{> ray_step} matches 1.. positioned ^ ^ ^#{"%.2f" % step} run \#{/#{self_ref}}"
       }
       ray_start = anonymous_function{|aout|
         aout << "> ray_step @s = #{steps}"
