@@ -30,6 +30,9 @@ module Remid
     attr_reader :warnings, :payload, :context, :cbuf, :fname
     attr_accessor :exception
 
+    ParseError = Class.new(::RuntimeError)
+    ResolveError = Class.new(ParseError)
+
     SPACES = [" ", "\t"].freeze
     ENCLOSERS = ["[", "]", "{", "}"].freeze
     T_SPACE = " ".freeze
@@ -140,7 +143,7 @@ module Remid
     end
 
     def parse
-      raise "concurrent parse error" if Thread.current[:fparse_rbuf]
+      raise ParseError, "concurrent parse error" if Thread.current[:fparse_rbuf]
       @li_no = @li_offset
       @cbuf = []
       @rbuf = []
@@ -189,7 +192,7 @@ module Remid
           end
           next
         elsif @line.peek == T_EVAL_END
-          raise "unexcepected T_EVAL_END #{T_EVAL_END} in #{@rsrc}:#{@li_no}"
+          raise ParseError, "unexcepected T_EVAL_END #{T_EVAL_END} in #{@rsrc}:#{@li_no}"
         end
 
         # indent
@@ -270,9 +273,9 @@ module Remid
         end
       end
 
-      raise "OpenRAL: expected >> but found EOF (opened `#{@state[:ral_entry]}' in #{@rsrc}:#{@state[:ral_lino]})" if @state[:in_ral]
-      raise "OpenAnonymous: expected >>> but found EOF (opened `#{@state[:anon_entry]}' in #{@rsrc}:#{@state[:anon_lino]})" if @state[:in_anonymous]
-      raise "OpenEvalBlock: expected __END__ but found EOF (opened in #{@rsrc}:#{@state[:eval_block_lino]})" if @state[:in_eval_block]
+      raise ParseError, "OpenRAL: expected >> but found EOF (opened `#{@state[:ral_entry]}' in #{@rsrc}:#{@state[:ral_lino]})" if @state[:in_ral]
+      raise ParseError, "OpenAnonymous: expected >>> but found EOF (opened `#{@state[:anon_entry]}' in #{@rsrc}:#{@state[:anon_lino]})" if @state[:in_anonymous]
+      raise ParseError, "OpenEvalBlock: expected __END__ but found EOF (opened in #{@rsrc}:#{@state[:eval_block_lino]})" if @state[:in_eval_block]
 
       commit_cbuf
     ensure
@@ -394,7 +397,7 @@ module Remid
 
     def _l_ral_close
       if !@state[:in_ral]
-        raise "unexcepected RAL close >> in #{@rsrc}:#{@li_no}"
+        raise ParseError, "unexcepected RAL close >> in #{@rsrc}:#{@li_no}"
       end
       @state.delete(:in_ral)
       @state.delete(:ral_entry_indent) # only needed for buffer fill and seek
@@ -419,7 +422,7 @@ module Remid
 
     def _l_anon_close
       if !@state[:in_anonymous]
-        raise "unexcepected AnonymousFunction close >>> in #{@rsrc}:#{@li_no}"
+        raise ParseError, "unexcepected AnonymousFunction close >>> in #{@rsrc}:#{@li_no}"
       end
       @state.delete(:in_anonymous)
       @state.delete(:anon_entry_indent) # only needed for buffer fill and seek
@@ -467,7 +470,7 @@ module Remid
 
     def _l_block_close silent = false
       if @state[:block_indent] == 0
-        raise "unexcepected T_BLOCK_CLOSE #{T_BLOCK_CLOSE} or T_SILENT_BLOCK_CLOSE #{T_SILENT_BLOCK_CLOSE} in #{@rsrc}:#{@li_no}"
+        raise ParseError, "unexcepected T_BLOCK_CLOSE #{T_BLOCK_CLOSE} or T_SILENT_BLOCK_CLOSE #{T_SILENT_BLOCK_CLOSE} in #{@rsrc}:#{@li_no}"
       end
       @line.read_while(SPACES) # padding
       #puts "close #{@state[:block_indent]}"
@@ -531,7 +534,7 @@ module Remid
             elsif depth > 0
               depth -= 1
             else
-              raise "unmatched brackets"
+              raise ParseError, "unmatched brackets in #{@rsrc}:#{@li_no}"
             end
 
             if depth == 0
@@ -573,10 +576,10 @@ module Remid
         end
         pointer += 1
       end
-      raise "unmatched interpolation" if depth > 0
+      raise ParseError, "unmatched interpolation in #{@rsrc}:#{@li_no}" if depth > 0
       r.join("")
     rescue Exception => ex
-      raise "#{ex.class}: #{ex.message} in #{@rsrc}:#{@li_no}"
+      raise "#{ex.class}: #{ex.message} in(terp) #{@rsrc}:#{@li_no}:#{pointer}"
     end
 
     module Resolvers
@@ -625,7 +628,7 @@ module Remid
           # > $objective
           resolve_objective(m[1])
         else
-          raise "did not understand scoreboard instruction: `#{instruct}'"
+          raise ParseError, "did not understand scoreboard instruction: `#{instruct}' in #{@rsrc}:#{@li_no}"
         end
       end
 
@@ -635,7 +638,7 @@ module Remid
         elsif m = instruct.match(/^([^\s]+)\s+([^\s]+)\s+(=|\+=|\-=|\*=|\/=|%=|><|<|>)\s+([^\s]+)\s+([^\s]+)$/i)
           "scoreboard players operation #{m[2]} #{resolve_objective(m[1])} #{m[3]} #{m[5]} #{resolve_objective(m[4])}"
         else
-          raise "did not understand scoreboard-operation instruction: `#{instruct}'"
+          raise ParseError, "did not understand scoreboard-operation instruction: `#{instruct}' in #{@rsrc}:#{@li_no}"
         end
       end
 
