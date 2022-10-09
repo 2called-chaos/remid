@@ -201,13 +201,13 @@ module Remid
         @state[:scoped_indent] += 1 if @state[:indent_increased]
         @state[:scoped_indent] -= 1 if @state[:indent_decreased]
 
-        if @state[:in_anonymous] && !(@line.peek(T_TRIPLE_GT.length) == T_TRIPLE_GT && @state[:indent] == 0)
-          @state[:anon_buffer] << @raw_line
+        if @state[:in_anonymous] && !(@line.peek(T_TRIPLE_GT.length) == T_TRIPLE_GT && @state[:indent] <= @state[:anon_entry_indent])
+          @state[:anon_buffer] << @raw_line[(@state[:anon_entry_indent] * @indent_per_level)..-1]
           next
         end
 
-        if @state[:in_ral] && !(@line.peek(T_DOUBLE_GT.length) == T_DOUBLE_GT && @state[:indent] == 0)
-          @state[:ral_buffer] << @raw_line
+        if @state[:in_ral] && !(@line.peek(T_DOUBLE_GT.length) == T_DOUBLE_GT && @state[:indent] == @state[:ral_entry_indent])
+          @state[:ral_buffer] << @raw_line[(@state[:ral_entry_indent] * @indent_per_level)..-1]
           next
         end
 
@@ -379,6 +379,7 @@ module Remid
     def _i_anon_open
       @state[:in_anonymous] = true
       @state[:anon_entry] = @cbuf.pop.delete_suffix(T_TRIPLE_LT)
+      @state[:anon_entry_indent] = @state[:indent]
       @state[:anon_lino] = @li_no
       @state[:anon_buffer] = []
     end
@@ -386,6 +387,7 @@ module Remid
     def _i_ral_open
       @state[:in_ral] = true
       @state[:ral_entry] = @cbuf.pop.delete_suffix(T_DOUBLE_LT)
+      @state[:ral_entry_indent] = @state[:indent]
       @state[:ral_lino] = @li_no
       @state[:ral_buffer] = []
     end
@@ -395,6 +397,7 @@ module Remid
         raise "unexcepected RAL close >> in #{@rsrc}:#{@li_no}"
       end
       @state.delete(:in_ral)
+      @state.delete(:ral_entry_indent) # only needed for buffer fill and seek
 
       if @state[:ral_buffer].empty?
         @state.delete(:ral_buffer)
@@ -419,6 +422,7 @@ module Remid
         raise "unexcepected AnonymousFunction close >>> in #{@rsrc}:#{@li_no}"
       end
       @state.delete(:in_anonymous)
+      @state.delete(:anon_entry_indent) # only needed for buffer fill and seek
 
       if @state[:anon_buffer].empty?
         @state.delete(:anon_buffer)
