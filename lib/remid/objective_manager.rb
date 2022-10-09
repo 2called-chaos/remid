@@ -34,7 +34,11 @@ module Remid
 
     def method_missing meth, *args, **kwargs, &block
       if args.empty? && kwargs.empty?
-        self[meth.to_s] || self["#{@namespace}_#{meth}"] || super
+        if meth.to_s.end_with?("?")
+          !!(self[meth.to_s[0..-2]] || self["#{@namespace}_#{meth.to_s[0..-2]}"])
+        else
+          self[meth.to_s] || self["#{@namespace}_#{meth}"] || super
+        end
       else
         super
       end

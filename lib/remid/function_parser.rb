@@ -104,7 +104,7 @@ module Remid
     end
 
     def tick key, tick_rate, execute_on = 0, &block
-      @context.objectives.add :tick unless @context.objectives["tick"]
+      @context.objectives.add :tick unless @context.objectives.tick?
       [].tap do |result|
         animation_code = anonymous_function(block.call.split("\n"))
         result << "> tick $#{key} += 0"
@@ -116,7 +116,7 @@ module Remid
     end
 
     def raycast target: "@p", steps: 50, step: 0.1, success:, failure: nil
-      @context.objectives.add :ray_step unless @context.objectives["ray_step"]
+      @context.objectives.add :ray_step unless @context.objectives.ray_step?
       ray_step = anonymous_function{|aout, self_ref|
         aout << "execute unless block ~ ~ ~ minecraft:air run \#{/#{success}}" if success
         aout << "execute unless block ~ ~ ~ minecraft:air run \#{> ray_step @s = 0}"
