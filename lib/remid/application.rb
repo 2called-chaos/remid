@@ -33,7 +33,7 @@ module Remid
     def initialize env, argv, &block
       @env = env
       @argv = argv
-      @opts = { watch: false, copy: false, success_script: nil, failure_script: nil }
+      @opts = { quiet: false, watch: false, copy: false, success_script: nil, failure_script: nil }
       @monitor = Monitor.new
       @cond = @monitor.new_cond
       @pending = Queue.new
@@ -50,6 +50,7 @@ module Remid
         opts.on("-c", "--copy DST", String, "Copy datapack to a directory after compile", "e.g. into a world save") {|v| @opts[:copy] = v.to_s }
         opts.on("-s", "--success SCRIPT", String, "Run this script after successful compilations") {|v| @opts[:success_script] = v.to_s }
         opts.on("-f", "--failure SCRIPT", String, "Run this script after failed compilations") {|v| @opts[:failure_script] = v.to_s }
+        opts.on("-q", "--quiet", "Only show files with warnings or errors") { @opts[:quiet] = true }
         opts.on("-w", "--watch", "Autocompile on changes in data source directory") { @opts[:watch] = true }
       end
     end
@@ -71,7 +72,7 @@ module Remid
       elsif !FileTest.directory?(@argv[0])
         puts "ERROR: Not a directory: #{@argv[0]}".red
       else
-        @sd = SourceDirectory.new(@argv[0])
+        @sd = SourceDirectory.new(@argv[0], @opts.slice(:quiet))
         if @opts[:watch]
           build_no = 0
           watch_source_directory

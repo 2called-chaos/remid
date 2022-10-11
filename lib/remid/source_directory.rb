@@ -5,7 +5,8 @@ module Remid
     COL = 10
     attr_reader :dir, :d_src, :d_bld, :d_dst, :context
 
-    def initialize dir
+    def initialize dir, opts = {}
+      @opts = opts.reverse_merge(quiet: false)
       @dir = Pathname.new(dir.delete_suffix("/").delete_suffix("\\"))
       @src = "data"
       @dst = "_datapack"
@@ -112,13 +113,17 @@ module Remid
         case type
         when :blob
           already_exists = File.exist?(@d_bld.join(rel_file))
-          puts col("F", already_exists ? :red : :magenta) + "./" + rel_file.to_s
+          if !@opts[:quiet] || warnings.any? || already_exists
+            puts col("F", already_exists ? :red : :magenta) + "./" + rel_file.to_s
+          end
           if already_exists
             warn col("") + "  ! ".red + "overwriting existing (generated) file".red
           end
           FileUtils.cp(file_or_data, @d_bld.join(rel_file))
         when :json
-          puts col("*", :silver) + "./" + rel_file.to_s
+          if !@opts[:quiet] || warnings.any?
+            puts col("*", :silver) + "./" + rel_file.to_s
+          end
           print_serialization_warnings(warnings)
           File.open(@d_bld.join(rel_file), "wb") {|f| f.write(ctx.opts.pretty_json ? JSON.pretty_generate(file_or_data) : JSON.generate(file_or_data)) }
         when :function, :anonymous_function
@@ -126,7 +131,9 @@ module Remid
             puts col("ERROR #", :red) + "./" + rel_file.to_s
             raise(file_or_data.exception)
           end
-          puts col(warnings.empty? ? "#" : "WARN #", warnings.empty? ? :green : :yellow) + "./" + rel_file.to_s
+          if !@opts[:quiet] || warnings.any?
+            puts col(warnings.empty? ? "#" : "WARN #", warnings.empty? ? :green : :yellow) + "./" + rel_file.to_s
+          end
           print_serialization_warnings(warnings)
           File.open(@d_bld.join(rel_file), "wb") {|f| f.write(file_or_data.as_string) }
         # when :anonymous_function
