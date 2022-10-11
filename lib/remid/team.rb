@@ -72,6 +72,20 @@ module Remid
       $remid.buf(cbuf) << "team remove #{@key}"
     end
 
+    def join selector = "@a"
+      "team join #{@key} #{selector}"
+    end
+    alias_method :<<, :join
+
+    def leave selector = "@a"
+      if selector.end_with?("]")
+        fixed_selector = "#{selector[0..-2]},team=#{@key}]"
+      else
+        fixed_selector = "#{selector}[team=#{@key}]"
+      end
+      "execute as #{fixed_selector} run team leave #{@key}"
+    end
+
     def to_s
       @key.to_s
     end
