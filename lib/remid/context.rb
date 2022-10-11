@@ -296,5 +296,9 @@ module Remid
         #end.join
       end
     end
+
+    def resource_pack name, &block
+      ResourcePack.new(self, name, &block)
+    end
   end
 end
