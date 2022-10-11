@@ -45,6 +45,15 @@ module Remid
         self
       end
 
+      def to_plain
+        "".tap do |r|
+          r << @string
+          @extras.each do |extra|
+            r << extra.to_plain
+          end
+        end
+      end
+
       def to_s
         r = []
         # r << '{"text":""}' if @extras.any?

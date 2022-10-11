@@ -249,6 +249,19 @@ module Remid
       @objectives.namespace = @scoreboard_namespace
     end
 
+    def __deindent_by_first_line str
+      lines = str.split("\n", -1)
+      lines.shift if lines.first == ""
+      indent = ""
+      if fl = lines.detect(&:presence)
+        flio = SeekableStringIO.new(fl)
+        while x = flio.readif(FunctionParser::SPACES)
+          indent << x
+        end
+      end
+      lines.map{|l| l[indent.length..-1] }.join("\n")
+    end
+
 
 
     # ------------------
@@ -263,15 +276,7 @@ module Remid
       elsif to_exec.is_a?(Array)
         __remid_register_function(func, to_exec.map{|fnc| "/#{fnc}" }.join("\n"), "#{caller.first}<STUBBED #{func}>")
       elsif to_exec.is_a?(String)
-        lines = to_exec.split("\n", -1)
-        lines.shift if lines.first == ""
-        flio = SeekableStringIO.new(lines.detect(&:presence))
-        indent = ""
-        while x = flio.readif(FunctionParser::SPACES)
-          indent << x
-        end
-        fixed_exec = lines.map{|l| l[indent.length..-1] }.join("\n")
-        __remid_register_function(func, fixed_exec, "#{caller.first}<STUBBED #{func}>")
+        __remid_register_function(func, __deindent_by_first_line(to_exec), "#{caller.first}<STUBBED #{func}>")
       else
         raise ArgumentError, "unknown execution type #{to_exec.class}"
       end
