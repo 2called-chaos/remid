@@ -228,6 +228,18 @@ module Remid
         end
       end
 
+      def tp *args
+        if args.first == false
+          @action[:tp] = false
+          self
+        elsif args.any?
+          @action[:tp] = args
+          self
+        else
+          @action[:tp]
+        end
+      end
+
       def to_give_function f, scope, index
         f << "item replace entity @s hotbar.#{index} with snowball{"
         f << "\tTags: [\"#{scope}.#{index}_#{safe_name}\"],"
@@ -239,7 +251,7 @@ module Remid
         if model = @action[:model]
           if model.is_a?(Symbol)
             lookup = @controller.class::MODELS
-            model = lookup.is_a?(Array) ? lookup.index(model) + 1 : lookup[model]
+            model = lookup.is_a?(Array) ? ((lookup.index(model) || -1) + 1) : lookup[model]
           end
           f << "\tCustomModelData: #{model || 0},"
         end
@@ -250,7 +262,7 @@ module Remid
         f << "execute as @e[type=snowball,nbt={Item:{tag:{Tags:[\"#{scope}.#{index}_#{safe_name}\"]}}}] at @s run <<<"
         if @action[:as_player].any? || @action[:regive] || @action[:enter] || @action[:leave]
           f << "\texecute as @p at @s run <<<"
-          f << "\t\texecute as @p[gamemode=!creative] run \#{/./give}" if @action[:regive]
+          f << "\t\texecute as @s[gamemode=!creative] run \#{/./give}" if @action[:regive] || (@action[:tp] && !@action[:leave])
 
           if @action[:enter]
             f << "\t\t/../leave"
@@ -264,6 +276,10 @@ module Remid
 
           if @action[:as_player][:run]
             f << "\t\t/#{@action[:as_player][:run]}"
+          end
+
+          if @action[:tp]
+            f << "\t\ttp @s #{@action[:tp].join(" ")}"
           end
 
           if @action[:as_player][:execute]
