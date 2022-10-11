@@ -14,7 +14,7 @@ module Remid
       @main_menu = :menu_main
       init if respond_to?(:init)
 
-      methods.grep(/^menu_/).each do |meth|
+      methods.sort.grep(/^menu_/).each do |meth|
         @menus[meth] = SlotGroup.new(self)
         begin
           @menu = @menus[meth]
