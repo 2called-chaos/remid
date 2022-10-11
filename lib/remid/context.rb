@@ -300,5 +300,9 @@ module Remid
     def resource_pack name, &block
       ResourcePack.new(self, name, &block)
     end
+
+    def import_sounds_from_pack base, namespace = nil
+      Sound.group_from_json(relative_target.join(base, "assets", namespace || @function_namespace, "sounds.json"), namespace || @function_namespace)
+    end
   end
 end

@@ -9,7 +9,6 @@ module Remid
       @sound_directories = []
       @retextures = {}
       @meta = { pack: { pack_format: 9, description: @name } }
-      @fs = {}
       setup(&block) if block
     end
 

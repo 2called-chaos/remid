@@ -1,6 +1,38 @@
 module Remid
   class Sound
-    def initialize(file, _data = {})
+    def self.group_from_json file_or_data, namespace
+      if file_or_data.is_a?(Hash)
+        data = file_or_data
+      else
+        data = JSON.parse(File.read(file_or_data))
+      end
+      Group.new.tap do |group|
+        data.each do |k, v|
+          ns = k.split(".")
+          entry = ns.pop
+          pointer = group
+          while subkey = ns.shift
+            pointer[subkey] ||= Group.new
+            unless pointer[subkey].is_a?(Group)
+              raise "attempted to step into #{subkey} and expected a group but got `#{pointer[subkey].inspect}'"
+            end
+            pointer = pointer[subkey]
+          end
+          if pointer[entry].is_a?(Group)
+            raise "attempted to add #{entry} but got a group with the same name `#{subkey}'"
+          end
+          pointer[entry] = Sound.new("#{namespace}:#{k}", {}, group: pointer)
+        end
+      end
+    end
+
+    class Group < OpenStruct
+    end
+
+    attr_reader :group
+
+    def initialize(file, _data = {}, group: nil)
+      @group = group
       @context = Context.new(self, { file: file }.merge(_data))
     end
 
@@ -17,9 +49,18 @@ module Remid
         })
       end
 
+      def variation key, data = {}, &block
+        raise "cannot add variation when sound is not in a group!" unless @sound.group
+        if @sound.group[key]
+          raise "attempted to add variation `#{key}` but it already exists as `#{@sound.group[key].class}'"
+        end
+        @sound.group[key] = play(data)
+      end
+
       def play _data = {}
         Context.new(@sound, @data.merge(_data))
       end
+      alias_method :dupe, :play
 
       %i[master music record weather block hostile neutral player ambient voice].each do |meth|
         define_method(meth) { source(meth) }
