@@ -113,13 +113,13 @@ module Remid
         animation_code = anonymous_function(block.call.split("\n"))
         result << "> tick $#{key} += 0"
         result << "execute if score $#{key} \#{> tick} matches #{execute_on} run \#{/#{animation_code}}"
-        result << "> tick $#{key} += 1"
+        result << "> tick $#{key} += 1" if tick_rate
         result << "execute if score $#{key} \#{> tick} matches #{execute_on} run \#{/#{animation_code}}" if tick_rate && tick_rate == execute_on
         result << "execute if score $#{key} \#{> tick} matches #{tick_rate}.. run \#{> tick $#{key} = 0}" if tick_rate
       end.reverse.each {|line| @ibuf.unshift(line) }
     end
 
-    def raycast target: "@p", steps: 50, step: 0.1, success:, failure: nil
+    def raycast target: "@p", steps: 50, step: 0.1, success: nil, failure: nil
       @context.objectives.add :ray_step unless @context.objectives.ray_step?
       ray_step = anonymous_function{|aout, self_ref|
         aout << "execute unless block ~ ~ ~ minecraft:air run \#{/#{success}}" if success
