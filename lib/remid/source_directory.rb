@@ -15,7 +15,8 @@ module Remid
       @d_dst = @dir.join(@dst)
       @d_dstp = @dir.join("#{@dst}.prev")
 
-      $remid = @context = Context.new(self)
+      $__remid_original_globals ||= global_variables
+      $remid = @context = Context.new(self, $__remid_original_globals)
       @context.relative_target = @dir
       @context.__remid_load_manifest(@dir.join("remid.rb"))
     end
@@ -26,7 +27,8 @@ module Remid
 
     def compile! build_no: nil
       puts col("COMPILING", :yellow) + @dir.to_s.magenta
-      $remid = @context = Context.new(self)
+      $remid&.deregister!
+      $remid = @context = Context.new(self, $__remid_original_globals)
       @context.relative_target = @dir
       @context.__remid_load_manifest(@dir.join("remid.rb"))
       return unless ensure_source
@@ -40,6 +42,8 @@ module Remid
       }
       result[:rt] = rt
       finally_move_build(result, build_no: build_no)
+    ensure
+      $remid.deregister!
     end
 
     def ensure_source

@@ -4,7 +4,8 @@ module Remid
     attr_reader :opts, :vectors, :meta, :objectives, :scheduler, :functions, :anonymous_functions, :blobs, :jsons, :parser, :on_load, :on_tick, :tag
     attr_accessor :function_namespace, :scoreboard_namespace, :relative_target, :teams
 
-    def initialize sd
+    def initialize sd, global_vars = nil
+      @global_vars = global_vars || global_variables
       @sd = sd
       @opts = OpenStruct.new({
         mcmeta: true,
@@ -33,6 +34,12 @@ module Remid
         south: AngleGroup.new(0.0, 0.0).deep_freeze,
         west:  AngleGroup.new(90.0, 0.0).deep_freeze,
       }.freeze
+    end
+
+    def deregister!
+      (global_variables - @global_vars).each do |var|
+        eval("#{var} = nil")
+      end
     end
 
     def uuid
