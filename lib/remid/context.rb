@@ -1,7 +1,7 @@
 module Remid
   class Context
     COL = 10
-    attr_reader :opts, :scope, :vectors, :meta, :objectives, :scheduler, :functions, :anonymous_functions, :blobs, :jsons, :parser, :on_load, :on_tick, :tag
+    attr_reader :opts, :sd, :scope, :vectors, :meta, :objectives, :scheduler, :functions, :anonymous_functions, :blobs, :jsons, :parser, :on_load, :on_tick, :tag, :knows_world_spawn
     attr_accessor :function_namespace, :scoreboard_namespace, :relative_target, :teams
 
     def initialize sd, global_vars = nil, scope: :compile
@@ -76,6 +76,16 @@ module Remid
       else
         @on_tick = []
       end
+    end
+
+    def remember_world_spawn
+      buf << "kill @e[tag=__remid.world_spawn]"
+      buf << "summon marker ~ ~ ~ {Tags:[__remid.world_spawn]}"
+      @knows_world_spawn = true
+    end
+
+    def knows_world_spawn?
+      !!@knows_world_spawn
     end
 
     def watch *paths
