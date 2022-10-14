@@ -45,6 +45,7 @@ module Remid
     end
 
     def build_to dir
+      return if @context.scope == :setup
       target_base = @context.relative_target.join(dir)
       base = Pathname.new("#{target_base}.build")
 
@@ -104,7 +105,7 @@ module Remid
 
       target_base
     ensure
-      FileUtils.rm_rf(base.to_s) if base.exist?
+      FileUtils.rm_rf(base.to_s) if base&.exist?
     end
 
     def _build_mcmeta base

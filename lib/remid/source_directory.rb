@@ -16,7 +16,7 @@ module Remid
       @d_dstp = @dir.join("#{@dst}.prev")
 
       $__remid_original_globals ||= global_variables
-      $remid = @context = Context.new(self, $__remid_original_globals)
+      $remid = @context = Context.new(self, $__remid_original_globals, scope: :setup)
       @context.relative_target = @dir
       @context.__remid_load_manifest(@dir.join("remid.rb"))
     end

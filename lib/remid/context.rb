@@ -1,10 +1,11 @@
 module Remid
   class Context
     COL = 10
-    attr_reader :opts, :vectors, :meta, :objectives, :scheduler, :functions, :anonymous_functions, :blobs, :jsons, :parser, :on_load, :on_tick, :tag
+    attr_reader :opts, :scope, :vectors, :meta, :objectives, :scheduler, :functions, :anonymous_functions, :blobs, :jsons, :parser, :on_load, :on_tick, :tag
     attr_accessor :function_namespace, :scoreboard_namespace, :relative_target, :teams
 
-    def initialize sd, global_vars = nil
+    def initialize sd, global_vars = nil, scope: :compile
+      @scope = scope
       @global_vars = global_vars || global_variables
       @sd = sd
       @opts = OpenStruct.new({
