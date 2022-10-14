@@ -135,6 +135,10 @@ module Remid
       "execute as #{target} at @s anchored eyes positioned ^ ^ ^ anchored feet run #{resolve_fcall ray_start}"
     end
 
+    def j str = nil
+      JsonHelper::PresentedMinecraftString.wrap(str || "")
+    end
+
     def result_buffer
       @result_buffer ||= parse
     end

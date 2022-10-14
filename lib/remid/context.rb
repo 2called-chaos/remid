@@ -269,6 +269,10 @@ module Remid
       lines.map{|l| l[indent.length..-1] }.join("\n")
     end
 
+    def j str = nil
+      JsonHelper::PresentedMinecraftString.wrap(str || "")
+    end
+
 
 
     # ------------------
