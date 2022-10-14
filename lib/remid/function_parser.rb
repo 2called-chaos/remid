@@ -139,6 +139,36 @@ module Remid
       JsonHelper::PresentedMinecraftString.wrap(str || "")
     end
 
+    def save_player_inventory success:, failure: nil
+      @context.__stub_invsave_functions
+      failure = "__remid/invsave/save_failure" if failure == :auto
+
+      resolve_fcall anonymous_function{|aout|
+        aout << "execute as @s[tag=__remid.invsave.saved] run \#{/#{failure}}" if failure
+        aout << "execute as @s[tag=!__remid.invsave.saved] run <<<"
+        aout << "\t\#{/__remid/invsave/save}"
+        aout << "\t\#{/#{success}}"
+        aout << ">>>"
+      }
+    end
+
+    def restore_player_inventory success: nil, failure: nil
+      @context.__stub_invsave_functions
+      failure = "__remid/invsave/restore_failure" if failure == :auto
+
+      resolve_fcall anonymous_function{|aout|
+        aout << "execute as @s[tag=!__remid.invsave.saved] run \#{/#{failure}}" if failure
+        if success
+          aout << "execute as @s[tag=__remid.invsave.saved] run <<<"
+          aout << "\t\#{/__remid/invsave/restore}"
+          aout << "\t\#{/#{success}}"
+          aout << ">>>"
+        else
+          aout << "execute as @s[tag=__remid.invsave.saved] run \#{/__remid/invsave/restore}"
+        end
+      }
+    end
+
     def result_buffer
       @result_buffer ||= parse
     end

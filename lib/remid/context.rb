@@ -15,6 +15,7 @@ module Remid
         function_book: true,
       })
       @uuid = 0
+      @post_serializers = []
       @functions = {}
       @anonymous_functions = {}
       @blobs = {}
@@ -35,6 +36,10 @@ module Remid
         south: AngleGroup.new(0.0, 0.0).deep_freeze,
         west:  AngleGroup.new(90.0, 0.0).deep_freeze,
       }.freeze
+    end
+
+    def post_serialize &block
+      @post_serializers << block
     end
 
     def deregister!
@@ -164,6 +169,10 @@ module Remid
       __remid_serialize_anonymous_functions(data_path, result, &exporter)
       __remid_serialize_blobs(data_path, result, &exporter)
 
+      @post_serializers.each do |serializer|
+        serializer.call(result, self)
+      end
+
       result
     end
 
@@ -215,14 +224,29 @@ module Remid
       end
     end
 
-    def __remid_serialize_functions data_path, result
-      @functions.each do |rel_file, data|
-        begin
-          data.result_buffer # pre-parse for warnings and exceptions
-        rescue Exception => ex
-          data.exception = ex
+    def __remid_recurse_process fnlist
+      processed = []
+      i = 0
+      while (fnlist.keys - processed).any?
+        fnlist.dup.each do |rel_file, data|
+          next if processed.include?(rel_file)
+          processed << rel_file
+          begin
+            data.result_buffer # pre-parse for warnings and exceptions
+          rescue Exception => ex
+            data.exception = ex
+          end
+        end
+
+        i += 1
+        if i > 100
+          raise "RecursionError: kept resolving to new functions after 100 iterations, aborting..."
         end
       end
+    end
+
+    def __remid_serialize_functions data_path, result
+      __remid_recurse_process(@functions)
 
       @functions.each do |rel_file, data|
         data.finalize_buffer!
@@ -233,13 +257,7 @@ module Remid
     end
 
     def __remid_serialize_anonymous_functions data_path, result
-      @anonymous_functions.each do |rel_file, data|
-        begin
-          data.result_buffer # pre-parse for warnings and exceptions
-        rescue Exception => ex
-          data.exception = ex
-        end
-      end
+      __remid_recurse_process(@anonymous_functions)
 
       @anonymous_functions.each do |rel_file, data|
         data.finalize_buffer!
@@ -284,11 +302,121 @@ module Remid
       JsonHelper::PresentedMinecraftString.wrap(str || "")
     end
 
+    def __stub_invsave_functions
+      @objectives.add :__remid_invsave unless @objectives.__remid_invsave?
+
+      stub_nil("__remid/invsave/save_failure", %{
+        tellraw @s \#{j("Failed to store your inventory!").red}
+        tellraw @s \#{j("(you probably already have an active save)").red}
+      })
+
+      _tmpmarker = "type=marker,tag=__remid.invsave.player_inventory,tag=__remid.pending"
+      stub_nil("__remid/invsave/save", %{
+        # summon marker
+        summon marker ~ ~ ~ { Tags: [__remid, __remid.invsave, __remid.invsave.player_inventory, __remid.pending] }
+
+        # link marker to player
+        >! /cc_id @e[#{_tmpmarker}] = @s
+
+        # copy inventory
+        data modify entity @e[#{_tmpmarker},limit=1] data.Inventory set from entity @s Inventory
+
+        # teleport marker to spawn if possible
+        execute if entity @e[type=marker,tag=__remid.world_spawn] run
+          tp @e[#{_tmpmarker}] @e[type=marker,tag=__remid.world_spawn,limit=1]
+
+        # marker is finalised
+        tag @e[#{_tmpmarker},limit=1] remove __remid.pending
+
+        # tag player as having an inventory saved
+        tag @s add __remid.invsave.saved
+      })
+
+      stub_nil("__remid/invsave/restore_failure", %{
+        tellraw @s #{j("Failed to restore your inventory!").red}
+        tellraw @s \#{j("(you probably have no save or the marker got unloaded)").red}
+      })
+
+      stub_nil("__remid/invsave/restore", %{
+        # tag player
+        tag @s add __remid.invsave.is_restoring
+
+        # find marker and restore it
+        execute
+          at @s
+          as @e[type=marker,tag=__remid.invsave.player_inventory,tag=!__remid.pending]
+          if score @s cc_id = @a[tag=__remid.invsave.is_restoring,limit=1] cc_id
+          run \#{/./restore_marker}
+
+        # remove tag from player
+        tag @s remove __remid.invsave.is_restoring
+        tag @s remove __remid.invsave.saved
+      })
+
+      _holdent = "type=armor_stand,tag=__remid.invsave.restore_holdent"
+      stub_nil("__remid/invsave/restore_marker", %{
+        # summon temporary inventory holding entity
+        summon armor_stand ~ ~ ~ { Tags: [__remid, __remid.invsave, __remid.invsave.restore_holdent] }
+
+        # tag marker to find it again in sub
+        tag @s add __remid.invsave.is_restoring_from
+
+        # give items back
+        execute if data entity @s data.Inventory[0] run \#{/./return_marker_items_recurse}
+
+        # kill temp holder & marker
+        kill @e[type=armor_stand,tag=__remid.invsave.restore_holdent]
+        kill @s
+      })
+
+      stub_nil("__remid/invsave/return_marker_items_recurse", %{
+        # remember slot number
+        execute store result score #rslot \#{> __remid_invsave} run data get entity @s data.Inventory[0].Slot
+
+        # remove the slot data so it doesn't get removed from the chest
+        data remove entity @s data.Inventory[0].Slot
+
+        # copy the item data to the holder entity
+        data modify entity @e[#{_holdent},limit=1] HandItems[0] set from entity @s data.Inventory[0]
+
+        # give player the item based the slot number
+        execute as @a[tag=__remid.invsave.is_restoring] run \#{/./return_item_to_correct_slot}
+
+        # remove item data from entity
+        data remove entity @s data.Inventory[0]
+
+        # recurse
+        execute if data entity @s data.Inventory[0] run \#{/::self}
+      })
+
+      _csinvsel = "type=armor_stand,tag=__remid.invsave.restore_holdent,limit=1"
+      stub_nil("__remid/invsave/return_item_to_correct_slot") do |aout|
+        restore_slot = proc do |rslot, outslot|
+          aout << "execute if score #rslot \#{> __remid_invsave} matches #{rslot} run"
+          aout << "\titem replace entity @s #{outslot} from entity @e[#{_holdent},limit=1] weapon.mainhand"
+          aout << "execute if score #rslot \#{> __remid_invsave} matches #{rslot} run say #{rslot} to #{outslot}"
+        end
+
+        restore_slot[-106, "weapon.offhand"]
+        9.times {|i| restore_slot[i, "hotbar.#{i}"] }
+        restore_slot[100, "armor.feet"]
+        restore_slot[101, "armor.legs"]
+        restore_slot[102, "armor.chest"]
+        restore_slot[103, "armor.head"]
+        27.times {|i| restore_slot[9 + i, "inventory.#{i}"] }
+      end
+    end
+
 
 
     # ------------------
     # --- Public API ---
     # ------------------
+
+    def stub_nil func, to_exec = nil, &execute
+      return @functions[func] if @functions[func]
+      stub(func, to_exec, &execute)
+    end
 
     def stub func, to_exec = nil, &execute
       if execute

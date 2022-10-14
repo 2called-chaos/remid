@@ -25,6 +25,15 @@ module Remid
       end
     end
 
+    def keep_player_inventory!
+      @keep_player_inventory = true
+      $remid.post_serialize do
+        unless $remid.knows_world_spawn
+          raise "cannot keep player inventory without remembering the world spawn. Please add `#~~ $remid.remember_world_spawn` to your init function."
+        end
+      end
+    end
+
     def main which
       @main_menu = :"menu_#{which}"
     end
@@ -34,28 +43,54 @@ module Remid
     end
 
     def mount!
-      $remid.stub "#{@scope}/enter", %{
-        execute as @s[tag=!hbc.in.#{@scope}] run <<<
-        \t# @todo store inventory
-        \tsay todo: store your inventory
-        \tclear @s
-        \ttag @s add hbc.in.#{@scope}
-        \t/./#{@main_menu}/enter
-        >>>
+      if @keep_player_inventory
+        # $remid.stub("__remid/invsave/save")
+        # $remid.stub("__remid/invsave/restore")
+        # $remid.stub "__remid/invsave/is_saved", %{
+        #   execute as @a if score @s points = @e[tag=compare,limit=1] points run I have the same points
+
+        #   #/execute if entity @e[tag=__remid.world_spawn] run say hi
+        # }
+        # CONTINUE_HERE
+        #/tp @s @e[tag=__remid.world_spawn,limit=1]
+      end
+
+      if @keep_player_inventory
+        $remid.stub "#{@scope}/enter", %{
+          execute as @s[tag=!hbc.in.#{@scope}] run
+          \t\#{save_player_inventory(success: "./enter_post", failure: :auto)}
+        }
+      else
+        $remid.stub "#{@scope}/enter", %{
+          execute as @s[tag=!hbc.in.#{@scope}] run \#{/./enter_post}
+        }
+      end
+
+      $remid.stub "#{@scope}/enter_post", %{
+        clear @s
+        tag @s add hbc.in.#{@scope}
+        /./#{@main_menu}/enter
       }
 
-      $remid.stub "#{@scope}/leave" do |f|
-        f << "execute as @s[tag=hbc.in.#{@scope}] run <<<"
-        f << "\t# @todo restore inventory"
-        f << "\tsay todo: restore your inventory"
-        f << "\tclear @s"
-        f << "\ttag @s remove hbc.in.#{@scope}"
+      if @keep_player_inventory
+        $remid.stub "#{@scope}/leave", %{
+          execute as @s[tag=hbc.in.#{@scope}] run <<<
+          \t\#{/./leave_pre}
+          \t\#{restore_player_inventory}
+          >>>
+        }
+      else
+        $remid.stub "#{@scope}/leave", %{
+          execute as @s[tag=hbc.in.#{@scope}] run \#{/./leave_pre}
+        }
+      end
+
+      $remid.stub "#{@scope}/leave_pre" do |f|
         @menus.each do |mname, mobj|
-          f << "\ttag @s remove hbc.#{@scope}.#{mname}"
+          f << "execute as @s[tag=hbc.in.#{@scope},tag=hbc.#{@scope}.#{mname}] run \#{/./#{mname}/leave}"
         end
-        f << "\titem replace entity @s hotbar.0 with minecraft:stick"
-        f << "\titem replace entity @s hotbar.1 with minecraft:wooden_axe"
-        f << ">>>"
+        f << "tag @s remove hbc.in.#{@scope}"
+        f << "clear @s"
       end
 
       ticks = []
