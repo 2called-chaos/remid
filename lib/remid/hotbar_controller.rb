@@ -294,9 +294,9 @@ module Remid
       end
 
       def to_tick_function f, scope, index
-        f << "execute as @e[type=snowball,nbt={Item:{tag:{Tags:[\"#{scope}.#{index}_#{safe_name}\"]}}}] at @s run <<<"
+        f << "execute as @e[type=snowball,tag=!__remid.keep,nbt={Item:{tag:{Tags:[\"#{scope}.#{index}_#{safe_name}\"]}}}] at @s run <<<"
         if @action[:as_player].any? || @action[:regive] || @action[:enter] || @action[:leave]
-          f << "\texecute as @p at @s run <<<"
+          f << "\texecute as @p run <<<"
           f << "\t\texecute as @s[gamemode=!creative] run \#{/./give}" if @action[:regive] || (@action[:tp] && !@action[:leave])
 
           if @action[:enter]
@@ -335,7 +335,7 @@ module Remid
           end
         end
 
-        f << "\tkill @s"
+        f << "\tkill @s[tag=!__remid.keep]"
         f << ">>>"
       end
     end
