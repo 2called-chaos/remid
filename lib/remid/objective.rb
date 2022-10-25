@@ -5,7 +5,11 @@ module Remid
       @key = key
       @type = type
       @opts = opts
-      @opts.assert_valid_keys(:name, :display, :render)
+      @opts.assert_valid_keys(:name, :display, :render, :defaults, :lazy)
+    end
+
+    def lazy?
+      @opts[:lazy]
     end
 
     def create cbuf: nil
@@ -20,6 +24,12 @@ module Remid
 
       if @opts[:render]
         cbuf << "scoreboard objectives modify #{@key} rendertype #{@opts[:render]}"
+      end
+
+      if @opts[:defaults]
+        @opts[:defaults].each do |k, v|
+          cbuf << "scoreboard players set #{k} #{@key} #{v}"
+        end
       end
     end
 

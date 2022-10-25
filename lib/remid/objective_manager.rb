@@ -12,21 +12,23 @@ module Remid
       self[rkey] = Objective.new(self, rkey, type, **kw)
     end
 
-    def create_all cbuf: nil
+    def create_all cbuf: nil, include_lazy: false
       cbuf = $remid.buf(cbuf)
       ref1 = self
       cbuf << proc {|cbuf|
         ref1.each do |key, obj|
+          next if !include_lazy && obj.lazy?
           obj.create(cbuf: cbuf)
         end
       }
     end
 
-    def destroy_all cbuf: nil
+    def destroy_all cbuf: nil, include_lazy: true
       cbuf = $remid.buf(cbuf)
       ref1 = self
       cbuf << proc {|cbuf|
         ref1.each do |key, obj|
+          next if !include_lazy && obj.lazy?
           obj.destroy(cbuf: cbuf)
         end
       }
