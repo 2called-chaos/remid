@@ -652,7 +652,27 @@ module Remid
       end
 
       def resolve_scoreboard_instruct instruct
-        if m = instruct.match(/^([^\s]+)\s+([^\s]+)\s+(=|\+=|\-=)\s+([\-\+\d]+)$/i)
+        if m = instruct.match(/^(if|unless)\s+([^\s]+)\s+([^\s]+)\s+(==|=|!=|>|>=|<=|<)\s+([\-\+\d]+)$/i)
+          i_cond = m[1] == "if"
+          value = m[5]
+
+          case m[4]
+          when "==".freeze, "=".freeze
+            #
+          when "!=".freeze
+            i_cond = !i_cond
+          when ">".freeze
+            value = "#{value.to_i + 1}.."
+          when ">=".freeze
+            value = "#{value}.."
+          when "<=".freeze
+            value = "..#{value}"
+          when "<".freeze
+            value = "..#{value.to_i - 1}"
+          end
+
+          "#{i_cond ? :if : :unless} score #{m[3]} #{resolve_objective(m[2])} matches #{value}"
+        elsif m = instruct.match(/^([^\s]+)\s+([^\s]+)\s+(=|\+=|\-=)\s+([\-\+\d]+)$/i)
           # > $objective $player = VAL
           # > $objective $player += VAL
           # > $objective $player -= VAL
