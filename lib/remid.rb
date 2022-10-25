@@ -51,6 +51,7 @@ require "remid/json_helper"
 
 require "remid/entity"
 require "remid/coord"
+require "remid/cardinal_direction"
 require "remid/written_book"
 require "remid/function_book"
 require "remid/hotbar_controller"

@@ -8,12 +8,13 @@ module Remid
       args[0] = kwargs[:x] if kwargs.key?(:x)
       args[1] = kwargs[:y] if kwargs.key?(:y)
       args[2] = kwargs[:z] if kwargs.key?(:z)
-      new(*args, relative: true)
+      new(*args, facing: kwargs[:facing], relative: true)
     end
     attr_reader :x, :y, :z
 
-    def initialize(x, y, z, relative: false)
+    def initialize(x, y, z, facing: :north, relative: false)
       @relative = relative
+      @facing = CardinalDirection.new(facing)
       @frozen = false
       @x, @y, @z = x, y, z
       @original_position = to_a
@@ -28,15 +29,28 @@ module Remid
       self
     end
 
-    [:x, :y, :z].each do |axe|
+    [:x, :y, :z, :facing].each do |axe|
       define_method(:"#{axe}=") do |val|
         raise(FrozenError, "cannot modify frozen Remid::Coord") if frozen?
         instance_variable_set(:"@#{axe}", val)
       end
     end
 
+    def facing! dir
+      @facing = CardinalDirection.new(dir)
+      self
+    end
+
+    def facing *args
+      if args.empty?
+        @facing
+      else
+        dupe.facing!(*args)
+      end
+    end
+
     def original_position
-      Coord.new(*@original_position, relative: @relative)
+      Coord.new(*@original_position, relative: @relative, facing: @facing)
     end
 
     def to_sel *axis
@@ -101,7 +115,7 @@ module Remid
     end
 
     def dupe
-      Coord.new(x, y, z, relative: @relative)
+      Coord.new(x, y, z, relative: @relative, facing: @facing)
     end
 
     def delta d_to
@@ -160,6 +174,25 @@ module Remid
       args
     end
 
+    def _resolve_relative kw, target
+      kw[:r] = -kw[:l] if kw.key?(:l)
+      kw[:f] = -kw[:b] if kw.key?(:b)
+
+      if kw[:r]
+        fvec = @facing.right.vector.mult(kw[:r])
+        target.x += fvec.x
+        target.z += fvec.z
+      end
+
+      if kw[:f]
+        fvec = @facing.vector.mult(kw[:f])
+        target.x += fvec.x
+        target.z += fvec.z
+      end
+
+      target
+    end
+
     def abs
       dupe.abs!
     end
@@ -176,7 +209,7 @@ module Remid
       self.x += kw[:x] || args[0] || 0
       self.y += kw[:y] || args[1] || 0
       self.z += kw[:z] || args[2] || 0
-      self
+      _resolve_relative(kw, self)
     end
 
     def set(*args, **kw)
@@ -193,7 +226,8 @@ module Remid
       copy.x += kw[:x] || args[0] || 0
       copy.y += kw[:y] || args[1] || 0
       copy.z += kw[:z] || args[2] || 0
-      copy
+
+      _resolve_relative(kw, copy)
     end
 
     def mult! *xargs, **kw
@@ -239,13 +273,6 @@ module Remid
     end
 
 
-    VECTORS = {
-      direction: {
-        north: Coord.new(0, 0, -1, relative: true).freeze,
-        east:  Coord.new(1, 0, 0, relative: true).freeze,
-        south: Coord.new(0, 0, 1, relative: true).freeze,
-        west:  Coord.new(-1, 0, 0, relative: true).freeze,
-      }.freeze
-    }
+    VECTORS = {}
   end
 end
