@@ -23,12 +23,22 @@ module Remid
         end
       end
 
+      def undef! key
+        @opts.delete(key)
+        self
+      end
+
+      def notext!
+        @string = false
+        self
+      end
+
       def merged! with = {}, add_extra = []
         self.class.new(@string, @opts.merge(with), @extras + add_extra)
       end
 
       def merge_arg args, key, default = nil
-        merged(key => args.any? ? args.first : default)
+        merged(key => args.empty? ? default : args.first)
       end
 
       def wrap *whats
@@ -45,6 +55,14 @@ module Remid
         self
       end
 
+      def join *args
+        ref = self
+        args.each do |arg|
+          ref = ref + arg
+        end
+        ref
+      end
+
       def to_plain
         "".tap do |r|
           r << @string
@@ -54,14 +72,29 @@ module Remid
         end
       end
 
+      def as_data
+        r = []
+        nopts = @opts.except(:merge_on_self)
+        nopts[:text] = @string if @string
+        r << nopts.compact
+
+        @extras.each do |extra|
+          r << extra.as_data
+        end
+
+        r.flatten
+      end
+
       def to_s
         r = []
         # r << '{"text":""}' if @extras.any?
         r << '""' if @extras.any?
         if (@opts.keys - [:merge_on_self]).empty?
-          r << %{"#{@string}"}
+          r << %{"#{@string.gsub("\n", "\\n")}"}
         else
-          r << @opts.merge(text: @string).except(:merge_on_self).compact.to_json
+          nopts = @opts.except(:merge_on_self)
+          nopts[:text] = @string if @string
+          r << nopts.compact.to_json
         end
 
         @extras.each do |extra|
@@ -70,6 +103,10 @@ module Remid
         r.join(",")
       end
       alias_method :to_str, :to_s
+
+      def tell target = "@s"
+        "tellraw #{target} [#{to_s}]"
+      end
 
       def finalize_delayed!
         _finalize_delayed_recursive(@opts, @opts)
@@ -126,9 +163,14 @@ module Remid
       end
 
       # Colors
-      %i[black dark_blue dark_green dark_aqua dark_red dark_purple gold gray dark_gray blue green aqua red light_purple yellow white].each do |meth|
+      %i[
+        black dark_blue dark_green dark_aqua dark_red dark_purple gold gray
+        dark_gray blue green aqua red light_purple yellow white
+      ].each do |meth|
         define_method(meth) { merged(color: meth) }
       end
+      define_method(:magenta) { merged(color: :light_purple) }
+      define_method(:cyan) { merged(color: :aqua) }
 
       def color clr
         merged(color: clr)
@@ -142,9 +184,9 @@ module Remid
           cmd = kw[:run] || kw[:suggest]
           if cmd.start_with?("/")
             raise "cannot resolve functions without remid context" unless Thread.current[:fparse_inst]
-            cmd = Thread.current[:fparse_inst].resolve_fcall(cmd.delete_prefix("/"))
+            cmd = Thread.current[:fparse_inst].resolve_fcall(cmd.delete_prefix("/")).prepend("/")
           end
-          cmd = cmd.prepend("/")
+          cmd = cmd.delete_prefix("~")
           merged(clickEvent: { action: (kw.key?(:run) ? "run_command" : "suggest_command"), value: cmd })
         elsif kw.key?(:url)
           url = kw[:url]
@@ -174,10 +216,21 @@ module Remid
         kw[:text] = farg if farg
 
         if kw.key?(:text)
+          if kw[:text].is_a?(PresentedMinecraftString)
+            kw[:text] = kw[:text].as_data
+          end
           merged(hoverEvent: { action: "show_text", value: kw[:text] })
         else
           raise "unknown hover type #{kw}"
         end
+      end
+
+      def score objective, name = "*", resolve_objective: true
+        if resolve_objective
+          raise "cannot resolve functions without remid context" unless Thread.current[:fparse_inst]
+          objective = Thread.current[:fparse_inst].resolve_objective(objective)
+        end
+        merged(score: { objective: objective, name: name }).notext!
       end
     end
 
