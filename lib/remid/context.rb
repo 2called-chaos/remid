@@ -2,7 +2,7 @@ module Remid
   class Context
     COL = 10
     attr_reader :opts, :sd, :scope, :vectors, :meta, :objectives, :scheduler, :functions, :anonymous_functions, :blobs, :jsons, :parser, :on_load, :on_tick, :tag, :knows_world_spawn
-    attr_accessor :function_namespace, :scoreboard_namespace, :relative_target, :teams
+    attr_accessor :function_dir, :function_namespace, :scoreboard_namespace, :relative_target, :teams
 
     def initialize sd, global_vars = nil, scope: :compile
       @scope = scope
@@ -218,9 +218,11 @@ module Remid
     end
 
     def __remid_serialize_jsons data_path, result
+      pfn = Pathname.new(@function_namespace)
       @jsons.each do |rel_file, data|
-        result[:fcount] += 1
-        result[:size] += yield(:json, data_path.join(rel_file), data, []).size
+        result[:count] += 1
+        scoped_path = pfn.join(rel_file.relative_path_from(@function_dir))
+        result[:size] += yield(:json, data_path.join(scoped_path), data, []).size
       end
     end
 
@@ -268,9 +270,11 @@ module Remid
     end
 
     def __remid_serialize_blobs data_path, result
+      pfn = Pathname.new(@function_namespace)
       @blobs.each do |rel_file, file|
         result[:count] += 1
-        result[:size] += yield(:blob, data_path.join(rel_file), file, []).size
+        scoped_path = pfn.join(rel_file.relative_path_from(@function_dir))
+        result[:size] += yield(:blob, data_path.join(scoped_path), file, []).size
       end
     end
 
@@ -278,6 +282,7 @@ module Remid
       @function_namespace = value.presence
       @scheduler.namespace = @function_namespace
       self.scoreboard_namespace = value unless @scoreboard_namespace
+      self.function_dir = value unless @function_dir
     end
 
     def scoreboard_namespace= value

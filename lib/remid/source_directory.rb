@@ -96,7 +96,7 @@ module Remid
             end
           when ".mcfunction" # compile
             begin
-              funcname = rel_file.relative_path_from("#{context.function_namespace}/functions").to_s.delete_suffix(".mcfunction")
+              funcname = rel_file.relative_path_from("#{context.function_dir}/functions").to_s.delete_suffix(".mcfunction")
               context.__remid_register_function(funcname, file.read, file.to_s)
             rescue StandardError => ex
               warn col("ERROR", :red) + "./" + rel_file.to_s
