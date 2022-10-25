@@ -33,6 +33,8 @@ module Remid
 
     def group key
       @store[key] = StringCollection.new
+      yield(@store[key]) if block_given?
+      @store[key]
     end
   end
 end
