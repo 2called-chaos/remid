@@ -59,11 +59,13 @@ module Remid
     T_SLASH = "/".freeze
     T_BACKSLASH = "\\".freeze
     T_NSSEP = ":".freeze
+    T_AT = "@".freeze
 
-    def initialize context, fname, payload, src, a_binding = nil, skip_indent: 0, li_offset: 0
+    def initialize context, fname, payload, src, a_binding = nil, skip_indent: 0, li_offset: 0, anon_map: nil
       @context = context
       @payload = payload
       @a_binding = a_binding # || get_binding
+      @anon_map = anon_map
       @src = @rsrc = src
       rt = @context.relative_target&.to_s
       if rt && @src.to_s.start_with?(rt)
@@ -88,7 +90,11 @@ module Remid
 
     def anonymous_function buf = nil, &block
       buf ||= []
-      fkey = "#{@fname}/__anon_#{@li_no}"
+      fkey = "#{@fname}".split("/".freeze)
+      fkey.pop while fkey.last.start_with?("__anon".freeze)
+      fkey << "__anon_#{@li_no}"
+      fkey = fkey.join("/".freeze)
+
       if block
         if block.arity == 1
           block.call(buf)
@@ -345,7 +351,7 @@ module Remid
       # autofix trailing commas
       if context.opts.autofix_trailing_commas
         @rbuf.each_with_index do |cl, rbi|
-          unless cl.start_with?("#")
+          unless cl.start_with?(T_COMMENT)
             while ci = cl.index(/,(\s+[\}\]])/)
               unless context.opts.autofix_trailing_commas == :silent
                 warnings << "autofix: removed trailing comma in output-line #{rbi + 1}:#{ci} `#{cl[([ci-10, 0].max)..(ci + 10)]}' of #{@rsrc}"
@@ -357,13 +363,14 @@ module Remid
       end
     end
 
-    def _execute_sub input_buffer, header: nil, footer: nil, concat: true, concat_warnings: nil, finalize: false, as_func: false, fname: nil
+    def _execute_sub input_buffer, header: nil, footer: nil, concat: true, concat_warnings: nil, finalize: false, as_func: false, fname: nil, anon_map: nil
       concat_warnings = concat if concat_warnings.nil?
       proc do
         a_binding = binding
         a_binding.local_variable_set(:a_context, @context)
         a_binding.local_variable_set(:a_src, @src)
         a_binding.local_variable_set(:a_fname, fname || @fname)
+        a_binding.local_variable_set(:a_anon_map, anon_map || @anon_map)
         a_binding.local_variable_set(:a_buffer, input_buffer)
         a_binding.local_variable_set(:a_li_offset, @li_no - input_buffer.length - (header ? 1 : 0) - 1)
         a_binding.local_variable_set(:a_skip_indent, @skip_indent + 1)
@@ -389,7 +396,7 @@ module Remid
         to_eval << %q{  end}
         #to_eval << %q{  parent_thread = Thread.main unless parent_thread[:fparse_cbuf]}
         to_eval << %q{  thr = Thread.new do}
-        to_eval << %q{    fp = FunctionParser.new(a_context, a_fname, a_buffer.join("\n"), a_src, s_binding, skip_indent: a_skip_indent, li_offset: a_li_offset)}
+        to_eval << %q{    fp = FunctionParser.new(a_context, a_fname, a_buffer.join("\n"), a_src, s_binding, skip_indent: a_skip_indent, li_offset: a_li_offset, anon_map: a_anon_map)}
         #to_eval << %q{    puts ">----------------------"}
         #to_eval << %q{    puts a_buffer.inspect}
         #to_eval << %q{    puts "=---------------------"}
@@ -471,10 +478,24 @@ module Remid
       a_entry = @state.delete(:anon_entry)
       a_buffer = @state.delete(:anon_buffer)
       a_lino = @state.delete(:anon_lino)
-      fkey = "#{@fname}/__anon_#{a_lino}"
-      xout = _execute_sub(a_buffer, concat: false, as_func: true)
-      fnc = @context.__remid_register_anonymous_function(fkey, xout)
-      @cbuf << a_entry + "function #{@context.function_namespace}:#{fnc}"
+
+      fkey = "#{@fname}".split("/".freeze)
+      fkey.pop while fkey.last.start_with?("__anon".freeze)
+      fkey << "__anon_#{a_lino}"
+      fkey = fkey.join("/".freeze)
+
+      if a_buffer.join.include?("::self")
+        fnc = @context.__remid_register_unique_anonymous_function(fkey) do |_fnc|
+          _execute_sub(a_buffer, concat: false, as_func: true, fname: _fnc, anon_map: [@fname, _fnc])
+        end
+      else
+        xout = _execute_sub(a_buffer, concat: false, as_func: true, anon_map: [@fname, fkey])
+        fnc = @context.__remid_register_anonymous_function(fkey, xout)
+      end
+
+      @line.read_while(SPACES)
+      fcall = @line.readif(T_AT) ? resolve_fcall("#{fnc} @ #{@line.read}") : resolve_fcall(fnc)
+      @cbuf << a_entry + fcall
     end
 
     def _l_eval append: false
@@ -556,14 +577,14 @@ module Remid
       while pointer < str.length
         #puts "p:#{pointer} d:#{depth} ii:#{in_interp} ib:#{ibuf}"
         if in_interp
-          if str[pointer] == "{"
+          if str[pointer] == "{".freeze
             if str[pointer - 1] == T_BACKSLASH
               ibuf.pop # remove backslash
             else
               depth += 1
             end
             ibuf << str[pointer]
-          elsif str[pointer] == "}"
+          elsif str[pointer] == "}".freeze
             if str[pointer - 1] == T_BACKSLASH
               ibuf.pop # remove backslash
             elsif depth > 0
@@ -596,7 +617,7 @@ module Remid
             ibuf << str[pointer]
           end
         else
-          if str[pointer] == "#" && str[pointer + 1] == "{"
+          if str[pointer] == "#".freeze && str[pointer + 1] == "{".freeze
             if str[pointer - 1] == T_BACKSLASH
               r.pop # remove backslash
             else
@@ -619,7 +640,7 @@ module Remid
 
     module Resolvers
       def resolve_objective str
-        if str.start_with?("/")
+        if str.start_with?("/".freeze)
           str[1..-1]
         else
           scoped_key = "#{@context.scoreboard_namespace}_#{str}"
@@ -636,12 +657,20 @@ module Remid
           # > $objective $player += VAL
           # > $objective $player -= VAL
           case m[3]
-          when "="
+          when "=".freeze
             "scoreboard players set #{m[2]} #{resolve_objective(m[1])} #{m[4]}"
-          when "+="
-            "scoreboard players add #{m[2]} #{resolve_objective(m[1])} #{m[4]}"
-          when "-="
-            "scoreboard players remove #{m[2]} #{resolve_objective(m[1])} #{m[4]}"
+          when "+=".freeze
+            if m[4].start_with?("-")
+              "scoreboard players remove #{m[2]} #{resolve_objective(m[1])} #{m[4][1..-1]}"
+            else
+              "scoreboard players add #{m[2]} #{resolve_objective(m[1])} #{m[4]}"
+            end
+          when "-=".freeze
+            if m[4].start_with?("-")
+              "scoreboard players add #{m[2]} #{resolve_objective(m[1])} #{m[4][1..-1]}"
+            else
+              "scoreboard players remove #{m[2]} #{resolve_objective(m[1])} #{m[4]}"
+            end
           end
         elsif m = instruct.match(/^([^\s]+)\s+([^\s]+)\s+(reset|enable)$/i)
           # > $objective $player reset
@@ -651,9 +680,9 @@ module Remid
           # > $objective $player ++
           # > $objective $player --
           case m[3]
-          when "++"
+          when "++".freeze
             "scoreboard players add #{m[2]} #{resolve_objective(m[1])} 1"
-          when "--"
+          when "--".freeze
             "scoreboard players remove #{m[2]} #{resolve_objective(m[1])} 1"
           end
         elsif m = instruct.match(/^([^\s]+)\s+([^\s]+)$/i)
@@ -679,17 +708,32 @@ module Remid
 
       def resolve_fcall _fcall
         fcall = _fcall
-        if fcall == "::self"
+
+        if fcall[T_AT]
+          fcall, fsched = fcall.split(T_AT).map(&:strip)
+          append = fsched.start_with?("<<".freeze)
+          fsched = fsched[2..-1].strip if append
+        end
+
+        if fcall == "::self".freeze
           fcall = @fname
+          is_self = true
+        elsif fcall == "::top".freeze
+          if @anon_map
+            fcall = @anon_map[0]
+          else
+            fcall = @fname
+          end
+          is_self = true
         end
 
         scope = @fname.to_s.split("/")
-        scope.pop while scope.last&.start_with?("__anon")
+        scope.pop while scope.last&.start_with?("__anon".freeze)
         _scope = scope.dup
         scope.pop
         was_relative = false
         # puts "#{fcall.inspect} #{scope}"
-        while fcall.start_with?("../")
+        while fcall.start_with?("../".freeze)
           was_relative = true
           if scope.empty?
             raise FunctionResolveError, "Encountered ../ when already in root scope, was resolving `#{_fcall}' in `#{_scope}' with `#{fcall}' remaining in #{@rsrc}:#{@li_no}"
@@ -698,20 +742,15 @@ module Remid
           fcall = fcall[3..-1]
         end
 
-        if fcall.start_with?("./") || was_relative
-          fcall = fcall[2..-1] if fcall.start_with?("./")
-          fcall = "#{scope.join("/")}/#{fcall}".delete_prefix("/")
+        if fcall.start_with?("./".freeze) || was_relative
+          fcall = fcall[2..-1] if fcall.start_with?("./".freeze)
+          fcall = "#{scope.join("/".freeze)}/#{fcall}".delete_prefix("/".freeze)
         end
 
         fcall = "#{@context.function_namespace}:#{fcall}" unless fcall[T_NSSEP]
 
-        if fcall["@"]
-          fcall, fsched = fcall.split("@").map(&:strip)
-          append = fsched.start_with?("<<")
-          fsched = fsched[2..-1].strip if append
-        end
 
-        is_self = "#{@context.function_namespace}:#{@fname}" == fcall
+        is_self = "#{@context.function_namespace}:#{@fname}" == fcall unless is_self
         if fcall.start_with?("#{@context.function_namespace}:") && !is_self && !(@context.functions[fcall.split(":")[1]] || @context.anonymous_functions[fcall.split(":")[1]])
           @warnings << "calling undefined function `#{fcall}' in #{@rsrc}:#{@li_no}"
         end

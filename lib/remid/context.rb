@@ -399,7 +399,6 @@ module Remid
         restore_slot = proc do |rslot, outslot|
           aout << "execute if score #rslot \#{> __remid_invsave} matches #{rslot} run"
           aout << "\titem replace entity @s #{outslot} from entity @e[#{_holdent},limit=1] weapon.mainhand"
-          aout << "execute if score #rslot \#{> __remid_invsave} matches #{rslot} run say #{rslot} to #{outslot}"
         end
 
         restore_slot[-106, "weapon.offhand"]
