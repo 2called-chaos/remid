@@ -484,7 +484,7 @@ module Remid
       fkey << "__anon_#{a_lino}"
       fkey = fkey.join("/".freeze)
 
-      if a_buffer.join.include?("::self")
+      if a_buffer.join.include?("::self".freeze)
         fnc = @context.__remid_register_unique_anonymous_function(fkey) do |_fnc|
           _execute_sub(a_buffer, concat: false, as_func: true, fname: _fnc, anon_map: [@fname, _fnc])
         end

@@ -113,40 +113,41 @@ module Remid
 
     def serialize_context ctx
       ctx.__remid_serialize do |type, rel_file, file_or_data, warnings|
-        FileUtils.mkdir_p(@d_bld.join(rel_file.dirname))
-        case type
-        when :blob
-          already_exists = File.exist?(@d_bld.join(rel_file))
-          if !@opts[:quiet] || warnings.any? || already_exists
-            puts col("F", already_exists ? :red : :magenta) + "./" + rel_file.to_s
+        @d_bld.join(rel_file).tap do |this_target|
+          FileUtils.mkdir_p(this_target.dirname)
+          case type
+          when :blob
+            already_exists = File.exist?(this_target)
+            if !@opts[:quiet] || warnings.any? || already_exists
+              puts col("F", already_exists ? :red : :magenta) + "./" + rel_file.to_s
+            end
+            if already_exists
+              warn col("") + "  ! ".red + "overwriting existing (generated) file".red
+            end
+            FileUtils.cp(file_or_data, this_target)
+          when :json
+            if !@opts[:quiet] || warnings.any?
+              puts col("*", :silver) + "./" + rel_file.to_s
+            end
+            print_serialization_warnings(warnings)
+            File.open(this_target, "wb") {|f| f.write(ctx.opts.pretty_json ? JSON.pretty_generate(file_or_data) : JSON.generate(file_or_data)) }
+          when :function, :anonymous_function
+            if file_or_data.exception
+              puts col("ERROR #", :red) + "./" + rel_file.to_s
+              raise(file_or_data.exception)
+            end
+            if !@opts[:quiet] || warnings.any?
+              puts col(warnings.empty? ? "#" : "WARN #", warnings.empty? ? :green : :yellow) + "./" + rel_file.to_s
+            end
+            print_serialization_warnings(warnings)
+            File.open(this_target, "wb") {|f| f.write(file_or_data.as_string) }
+          # when :anonymous_function
+          #   puts col("#", :green) + "./" + rel_file.to_s
+          #   File.open(this_target, "wb") {|f| f.write(file_or_data) }
+          else
+            raise "don't know how to serialize #{type}"
           end
-          if already_exists
-            warn col("") + "  ! ".red + "overwriting existing (generated) file".red
-          end
-          FileUtils.cp(file_or_data, @d_bld.join(rel_file))
-        when :json
-          if !@opts[:quiet] || warnings.any?
-            puts col("*", :silver) + "./" + rel_file.to_s
-          end
-          print_serialization_warnings(warnings)
-          File.open(@d_bld.join(rel_file), "wb") {|f| f.write(ctx.opts.pretty_json ? JSON.pretty_generate(file_or_data) : JSON.generate(file_or_data)) }
-        when :function, :anonymous_function
-          if file_or_data.exception
-            puts col("ERROR #", :red) + "./" + rel_file.to_s
-            raise(file_or_data.exception)
-          end
-          if !@opts[:quiet] || warnings.any?
-            puts col(warnings.empty? ? "#" : "WARN #", warnings.empty? ? :green : :yellow) + "./" + rel_file.to_s
-          end
-          print_serialization_warnings(warnings)
-          File.open(@d_bld.join(rel_file), "wb") {|f| f.write(file_or_data.as_string) }
-        # when :anonymous_function
-        #   puts col("#", :green) + "./" + rel_file.to_s
-        #   File.open(@d_bld.join(rel_file), "wb") {|f| f.write(file_or_data) }
-        else
-          raise "don't know how to serialize #{type}"
         end
-        @d_bld.join(rel_file)
       end
     end
 
