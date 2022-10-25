@@ -100,6 +100,7 @@ module Remid
         @extras.each do |extra|
           r << extra.to_s
         end
+        r.reject!.with_index{|_r, i| i != 0 && _r == '""' }
         r.join(",")
       end
       alias_method :to_str, :to_s
