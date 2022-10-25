@@ -6,7 +6,7 @@ module Remid
     attr_reader :dir, :d_src, :d_bld, :d_dst, :context
 
     def initialize dir, opts = {}
-      @opts = opts.reverse_merge(quiet: false)
+      @opts = opts.reverse_merge(quiet: false, keep_prev_build: true)
       @dir = Pathname.new(dir.delete_suffix("/").delete_suffix("\\"))
       @src = "data"
       @dst = "_datapack"
@@ -163,16 +163,20 @@ module Remid
     def finally_move_build result, build_no: nil
       # move old build if it exists
       if @d_dst.exist?
-        puts col("INFO", :cyan) + "moving " + "./#{@dst}".cyan + " to " + "./#{@dst}.prev".blue
-        FileUtils.rm_rf(@d_dstp) if @d_dstp.exist?
-        tries = 0
-        begin
-          FileUtils.mv(@d_dst, @d_dstp)
-        rescue Errno::EACCES, Errno::ENOENT
-          tries += 1
-          warn "Failed to move folders, retrying..."
-          sleep 1
-          tries < 5 ? retry : raise
+        if @opts[:keep_prev_build]
+          puts col("INFO", :cyan) + "moving " + "./#{@dst}".cyan + " to " + "./#{@dst}.prev".blue
+          FileUtils.rm_rf(@d_dstp) if @d_dstp.exist?
+          tries = 0
+          begin
+            FileUtils.mv(@d_dst, @d_dstp)
+          rescue Errno::EACCES, Errno::ENOENT
+            tries += 1
+            warn "Failed to move folders, retrying..."
+            sleep 1
+            tries < 5 ? retry : raise
+          end
+        else
+          FileUtils.rm_rf(@d_dst)
         end
       end
 
