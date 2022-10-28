@@ -31,10 +31,13 @@ module Remid
           cbuf << "scoreboard players set #{k} #{@key} #{v}"
         end
       end
+
+      self
     end
 
     def destroy cbuf: nil
       $remid.buf(cbuf) << "scoreboard objectives remove #{@key}"
+      self
     end
 
     def to_s

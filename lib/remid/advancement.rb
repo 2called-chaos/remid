@@ -224,6 +224,7 @@ module Remid
         @collection.with_parent(self) do
           @collection.with_scope(scope) { @collection.instance_eval(&block) }
         end
+        self
       end
 
       def criteria *args, &conditions

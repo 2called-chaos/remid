@@ -46,10 +46,10 @@ module Remid
     end
 
     def with_scope scope
-      @scopes << scope
+      @scopes << scope if scope
       yield
     ensure
-      @scopes.pop if @scopes.last == scope
+      @scopes.pop if scope && @scopes.last == scope
     end
   end
 end

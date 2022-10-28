@@ -127,6 +127,10 @@ module Remid
         end
       end
 
+      def length
+        to_plain.length
+      end
+
       def method_missing method, *a, **kw, &b
         ::Kernel.puts "DELEGATING:#{method}:#{a}"
         @string.send(method, *a, **kw, &b)
