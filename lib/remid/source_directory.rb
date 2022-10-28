@@ -125,7 +125,7 @@ module Remid
               warn col("") + "  ! ".red + "overwriting existing (generated) file".red
             end
             FileUtils.cp(file_or_data, this_target)
-          when :json
+          when :json, :advancement
             if !@opts[:quiet] || warnings.any?
               puts col("*", :silver) + "./" + rel_file.to_s
             end

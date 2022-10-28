@@ -1,7 +1,7 @@
 module Remid
   class Context
     COL = 10
-    attr_reader :opts, :sd, :scope, :vectors, :meta, :objectives, :scheduler, :functions, :anonymous_functions, :blobs, :jsons, :parser, :on_load, :on_tick, :tag, :knows_world_spawn
+    attr_reader :opts, :sd, :scope, :vectors, :meta, :objectives, :scheduler, :advancements, :functions, :anonymous_functions, :blobs, :jsons, :parser, :on_load, :on_tick, :tag, :knows_world_spawn
     attr_accessor :function_dir, :function_namespace, :scoreboard_namespace, :relative_target, :teams
 
     def initialize sd, global_vars = nil, scope: :compile
@@ -24,6 +24,7 @@ module Remid
       @meta = OpenStruct.new(pack_format: 10, description: "An undescribed datapack by an unknown author")
       @scheduler = FunctionScheduler.new(self)
       @objectives = ObjectiveManager.new(self)
+      @advancements = AdvancementManager.new(self)
       @teams = TeamManager.new(self)
       @tag = TagManager.new(self)
       @on_load = [:__remid_auto]
@@ -167,6 +168,7 @@ module Remid
       __remid_serialize_jsons(data_path, result, &exporter)
       __remid_serialize_functions(data_path, result, &exporter)
       __remid_serialize_anonymous_functions(data_path, result, &exporter)
+      __remid_serialize_advancements(data_path, result, &exporter)
       __remid_serialize_blobs(data_path, result, &exporter)
 
       @post_serializers.each do |serializer|
@@ -266,6 +268,15 @@ module Remid
         result[:warnings] += data.warnings.length
         result[:count] += 1
         result[:size] += yield(:anonymous_function, data_path.join(@function_namespace, "functions", Pathname.new("#{rel_file}.mcfunction")), data, data.warnings).size
+      end
+    end
+
+    def __remid_serialize_advancements data_path, result
+      @advancements.each do |key, adv|
+        res = adv.to_result
+        result[:warnings] += res[:warnings].length
+        result[:count] += 1
+        result[:size] += yield(:advancement, data_path.join(@function_namespace, "advancements", Pathname.new("#{adv.scoped_key}.json")), res[:data], res[:warnings]).size
       end
     end
 
