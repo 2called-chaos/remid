@@ -183,6 +183,14 @@ module Remid
       result_buffer.join("\n")
     end
 
+    def _buf_iappend to_append
+      if !@cbuf.last || @state[:indent] == @state[:block_indent] * @indent_per_level && !ENCLOSERS.include?(to_append[0])
+        @cbuf << process_interpolations(to_append)
+      else
+        @cbuf.last << T_SPACE << process_interpolations(to_append)
+      end
+    end
+
     def parse
       raise ParseError, "concurrent parse error" if Thread.current[:fparse_rbuf]
       @li_no = @li_offset
@@ -300,11 +308,7 @@ module Remid
         elsif @line.readif(T_SLASH)
           _l_command_helper
         else
-          if !@cbuf.last || @state[:indent] == @state[:block_indent] * @indent_per_level && !ENCLOSERS.include?(@line.peek(1))
-            @cbuf << process_interpolations(@line.read)
-          else
-            @cbuf.last << T_SPACE << process_interpolations(@line.read)
-          end
+          _buf_iappend(@line.read)
 
           # anonymous functions
           _i_anon_open if @cbuf.last&.end_with?(T_TRIPLE_LT)
@@ -553,18 +557,18 @@ module Remid
     def _l_scoreboard_op_helper
       @line.read_while(SPACES) # padding
       instruct = process_interpolations(@line.read)
-      @cbuf << resolve_scoreboard_op_instruct(instruct)
+      _buf_iappend resolve_scoreboard_op_instruct(instruct)
     end
 
     def _l_scoreboard_helper
       @line.read_while(SPACES) # padding
       instruct = process_interpolations(@line.read)
-      @cbuf << resolve_scoreboard_instruct(instruct)
+      _buf_iappend resolve_scoreboard_instruct(instruct)
     end
 
     def _l_command_helper
       fcall = process_interpolations(@line.read)
-      @cbuf << resolve_fcall(fcall)
+      _buf_iappend resolve_fcall(fcall)
     end
 
     def process_interpolations str
