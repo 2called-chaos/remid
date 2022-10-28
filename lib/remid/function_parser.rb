@@ -692,7 +692,7 @@ module Remid
               "scoreboard players remove #{m[2]} #{resolve_objective(m[1])} #{m[4]}"
             end
           end
-        elsif m = instruct.match(/^([^\s]+)\s+([^\s]+)\s+(reset|enable)$/i)
+        elsif m = instruct.match(/^([^\s]+)\s+([^\s]+)\s+(reset|enable|get)$/i)
           # > $objective $player reset
           # > $objective $player enable
           "scoreboard players #{m[3]} #{m[2]} #{resolve_objective(m[1])}"
@@ -707,7 +707,7 @@ module Remid
           end
         elsif m = instruct.match(/^([^\s]+)\s+([^\s]+)$/i)
           # > $objective $player
-          "scoreboard players get #{m[2]} #{resolve_objective(m[1])}"
+          "#{m[2]} #{resolve_objective(m[1])}"
         elsif m = instruct.match(/^([^\s]+)$/i)
           # > $objective
           resolve_objective(m[1])
