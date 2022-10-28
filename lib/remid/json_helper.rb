@@ -2,6 +2,7 @@ module Remid
   module JsonHelper
     class PresentedMinecraftStringBase
       attr_reader :opts
+      attr_accessor :base
 
       def self.wrap me
         return me if me.is_a?(PresentedMinecraftStringBase)
@@ -88,7 +89,8 @@ module Remid
       def to_s
         r = []
         # r << '{"text":""}' if @extras.any?
-        r << '""' if @extras.any?
+        r << @base.merge(text: "").to_json if @base
+        r << '""' if @extras.any? && r.empty?
         if (@opts.keys - [:merge_on_self]).empty?
           r << %{"#{@string.gsub("\n", "\\n")}"}
         else
