@@ -209,10 +209,11 @@ module Remid
             pl = proc {
               book = Thread.current[:__book]
               raise "failed to lookup page number without book context" unless book
-              (book.pages.index(kw[:page].to_sym) || 0) + 1
+              ((book.pages.index(kw[:page].to_sym) || 0) + 1).to_s
             }
           end
           pl = 0 unless pl
+          pl = pl.to_s if pl.is_a?(Numeric)
           merged(clickEvent: { action: "change_page", value: pl })
         else
           raise "unknown click type #{kw}"
@@ -226,7 +227,7 @@ module Remid
           if kw[:text].is_a?(PresentedMinecraftString)
             kw[:text] = kw[:text].as_data
           end
-          merged(hoverEvent: { action: "show_text", value: kw[:text] })
+          merged(hoverEvent: { action: "show_text", contents: kw[:text] })
         else
           raise "unknown hover type #{kw}"
         end
@@ -238,6 +239,19 @@ module Remid
           objective = Thread.current[:fparse_inst].resolve_objective(objective)
         end
         merged(score: { objective: objective, name: name }).notext!
+      end
+
+      def selector sel = "@s"
+        merged(selector: sel).notext!
+      end
+
+      def nbt path, **kw
+        kw[:entity] = "@s" if ([:entity, :block, :storage] - kw.keys).length == 3
+        merged({ nbt: path }.merge(kw)).notext!
+      end
+
+      def translate path, **kw
+        merged({ translate: path }.merge(kw)).notext!
       end
     end
 
