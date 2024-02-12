@@ -734,11 +734,16 @@ module Remid
 
       def resolve_fcall _fcall, miss: :warn
         fcall = _fcall
+        farg = nil
 
         if fcall[T_AT]
           fcall, fsched = fcall.split(T_AT).map(&:strip)
           append = fsched.start_with?("<<".freeze)
           fsched = fsched[2..-1].strip if append
+        end
+
+        if fcall[T_SPACE]
+          fcall, farg = fcall.split(T_SPACE, 2)
         end
 
         if fcall == "::self".freeze
@@ -784,6 +789,8 @@ module Remid
             return false
           end
         end
+
+        fcall << " " << farg if farg
 
         if fsched
           $remid.scheduler.schedule(fcall, fsched, append: append)
