@@ -732,7 +732,7 @@ module Remid
         end
       end
 
-      def resolve_fcall _fcall
+      def resolve_fcall _fcall, miss: :warn
         fcall = _fcall
 
         if fcall[T_AT]
@@ -778,7 +778,11 @@ module Remid
 
         is_self = "#{@context.function_namespace}:#{@fname}" == fcall unless is_self
         if fcall.start_with?("#{@context.function_namespace}:") && !is_self && !(@context.functions[fcall.split(":")[1]] || @context.anonymous_functions[fcall.split(":")[1]])
-          @warnings << "calling undefined function `#{fcall}' in #{@rsrc}:#{@li_no}"
+          if miss == :warn
+            @warnings << "calling undefined function `#{fcall}' in #{@rsrc}:#{@li_no}"
+          elsif miss == :return
+            return false
+          end
         end
 
         if fsched
