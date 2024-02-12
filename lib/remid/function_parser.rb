@@ -508,7 +508,7 @@ module Remid
       to_eval = @line.read
       begin
         eres = eval(to_eval, @a_binding)
-        @cbuf.push(eres.to_s) if append
+        _buf_iappend(eres.to_s) if append
         eres
       rescue Exception => ex
         warn ">> in #{@src || "unknown"}:#{@li_no}:#{eval_pos}"
