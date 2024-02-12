@@ -656,6 +656,7 @@ module Remid
       end
 
       def resolve_scoreboard_instruct instruct
+        instruct = instruct.strip
         if m = instruct.match(/^(if|unless)\s+([^\s]+)\s+([^\s]+)\s+(==|=|!=|>|>=|<=|<)\s+([\-\+\d]+)$/i)
           i_cond = m[1] == "if"
           value = m[5]
@@ -721,6 +722,7 @@ module Remid
       end
 
       def resolve_scoreboard_op_instruct instruct
+        instruct = instruct.strip
         if m = instruct.match(/^([^\s]+)\s+([^\s]+)\s+(=|\+=|\-=|\*=|\/=|%=|><|<|>)\s+([^\s]+)$/i)
           "scoreboard players operation #{m[2]} #{resolve_objective(m[1])} #{m[3]} #{m[4]} #{resolve_objective(m[1])}"
         elsif m = instruct.match(/^([^\s]+)\s+([^\s]+)\s+(=|\+=|\-=|\*=|\/=|%=|><|<|>)\s+([^\s]+)\s+([^\s]+)$/i)
