@@ -1,6 +1,6 @@
 module Remid
   class TagManager
-    TYPES = %i[blocks entities functions]
+    TYPES = %i[blocks fluids items entity_types entities game_events functions]
     attr_reader :context, :tags
 
     def initialize context
@@ -28,6 +28,10 @@ module Remid
         @type = type
         @tags = {}
         @replace = false
+      end
+
+      def type
+        @type == :entities ? :entity_types : @type
       end
 
       def [] key
