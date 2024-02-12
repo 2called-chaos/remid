@@ -17,13 +17,18 @@ module Remid
       @defaults.merge!(to_merge)
     end
 
+    def [] key
+      super(key.to_s)
+    end
+
     def add key, type = :task, **kw, &block
       rkey = key.to_s
+      rkey = (@scopes + [rkey]).join("/")
       raise "duplicate advancement error #{rkey} already taken" if self[rkey]
       callkw = @defaults
       callkw[:parent] = @parents.last if @parents.any?
       callkw = callkw.merge(kw)
-      self[rkey] = Advancement.new(self, rkey, type, **callkw, &block)
+      self[rkey] = Advancement.new(self, key.to_s, type, **callkw, &block)
     end
 
     def task key, **kw, &block

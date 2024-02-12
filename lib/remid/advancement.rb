@@ -19,6 +19,18 @@ module Remid
       # @opts.assert_valid_keys(:name, :display, :render, :defaults, :lazy)
     end
 
+    def to_s
+      "#{@context.function_namespace}:#{@scoped_key}"
+    end
+
+    def grant target = "@s", mode = :only
+      "advancement grant #{target} #{mode} #{to_s}"
+    end
+
+    def revoke target = "@s", mode = :only
+      "advancement revoke #{target} #{mode} #{to_s}"
+    end
+
     def _resolve
       @defined ||= begin
         @rsrc, @li_no = @definer.source_location
@@ -100,9 +112,7 @@ module Remid
 
     module Serializers
       def serialize_parent jdat
-        par = @data[:parent]
-        par = @data[:parent].key if par.is_a?(Advancement)
-        par = par.to_s
+        par = @data[:parent].to_s
         par = par.prepend("#{@context.function_namespace}:") unless par[":"]
         jdat[:parent] = par
       end
