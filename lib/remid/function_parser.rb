@@ -55,6 +55,8 @@ module Remid
     T_LT = "<".freeze
     T_DOUBLE_LT = "<<".freeze
     T_TRIPLE_LT = "<<<".freeze
+    T_FN_REF_BEGIN = "<<~".freeze
+    T_FN_REF_END = "~>>".freeze
     T_LTEQ = "<=".freeze
     T_SLASH = "/".freeze
     T_BACKSLASH = "\\".freeze
@@ -253,7 +255,7 @@ module Remid
         @state[:scoped_indent] += 1 if @state[:indent_increased]
         @state[:scoped_indent] -= 1 if @state[:indent_decreased]
 
-        if @state[:in_anonymous] && !(@line.peek(T_TRIPLE_GT.length) == T_TRIPLE_GT && @state[:indent] <= @state[:anon_entry_indent])
+        if @state[:in_anonymous] && !((@line.peek(T_TRIPLE_GT.length) == T_TRIPLE_GT || @line.peek(T_FN_REF_END.length) == T_FN_REF_END) && @state[:indent] <= @state[:anon_entry_indent])
           @state[:anon_buffer] << @raw_line[(@state[:anon_entry_indent] * @indent_per_level)..-1]
           next
         end
@@ -297,7 +299,7 @@ module Remid
           _l_block_close(true)
         elsif @line.peek(1) == T_COMMENT && @line.peek(2) != "#\{"
           _l_comment
-        elsif @line.readif(T_TRIPLE_GT)
+        elsif @line.readif(T_TRIPLE_GT) || @line.readif(T_FN_REF_END)
           _l_anon_close
         elsif @line.readif(T_DOUBLE_GT)
           _l_ral_close
@@ -312,6 +314,9 @@ module Remid
 
           # anonymous functions
           _i_anon_open if @cbuf.last&.end_with?(T_TRIPLE_LT)
+
+          # anonymous functions (keep args)
+          _i_anon_open(keep_args: true) if @cbuf.last&.end_with?(T_FN_REF_BEGIN)
 
           # repeat-a-line
           _i_ral_open if @cbuf.last&.end_with?(T_DOUBLE_LT)
@@ -425,12 +430,13 @@ module Remid
       end.call
     end
 
-    def _i_anon_open
+    def _i_anon_open keep_args: false
       @state[:in_anonymous] = true
-      @state[:anon_entry] = @cbuf.pop.delete_suffix(T_TRIPLE_LT)
+      @state[:anon_entry] = @cbuf.pop.delete_suffix(T_TRIPLE_LT).delete_suffix(T_FN_REF_BEGIN)
       @state[:anon_entry_indent] = @state[:indent]
       @state[:anon_lino] = @li_no
       @state[:anon_buffer] = []
+      @state[:anon_keep_args] = keep_args
     end
 
     def _i_ral_open
@@ -482,23 +488,43 @@ module Remid
       a_entry = @state.delete(:anon_entry)
       a_buffer = @state.delete(:anon_buffer)
       a_lino = @state.delete(:anon_lino)
+      a_keep_args = @state.delete(:anon_keep_args)
 
       fkey = "#{@fname}".split("/".freeze)
       fkey.pop while fkey.last.start_with?("__anon".freeze)
       fkey << "__anon_#{a_lino}"
       fkey = fkey.join("/".freeze)
 
+      @line.read_while(SPACES)
+      t_sched = false
+      fargs = nil
+      if @line.readif(T_AT)
+        t_sched = @line.read
+      else
+        fargs = @line.read.presence || @anon_map&.dig(2)
+      end
+
       if a_buffer.join.include?("::self".freeze)
         fnc = @context.__remid_register_unique_anonymous_function(fkey) do |_fnc|
-          _execute_sub(a_buffer, concat: false, as_func: true, fname: _fnc, anon_map: [@fname, _fnc])
+          _execute_sub(a_buffer, concat: false, as_func: true, fname: _fnc, anon_map: [@fname, _fnc, fargs])
         end
       else
-        xout = _execute_sub(a_buffer, concat: false, as_func: true, anon_map: [@fname, fkey])
+        xout = _execute_sub(a_buffer, concat: false, as_func: true, anon_map: [@fname, fkey, fargs])
         fnc = @context.__remid_register_anonymous_function(fkey, xout)
       end
 
       @line.read_while(SPACES)
-      fcall = @line.readif(T_AT) ? resolve_fcall("#{fnc} @ #{@line.read}") : resolve_fcall(fnc)
+      if t_sched
+        fcall = resolve_fcall("#{fnc} @ #{t_sched}")
+      else
+        fcall = resolve_fcall(fnc)
+        if fargs && a_keep_args
+          # @state[:fnarg] = fargs
+          fcall += " " << fargs
+        # elsif fargs && !a_keep_args
+        #   raise "why? #{fargs}"
+        end
+      end
       @cbuf << a_entry + fcall
     end
 
