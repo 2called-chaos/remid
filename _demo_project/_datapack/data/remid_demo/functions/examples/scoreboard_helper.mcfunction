@@ -22,12 +22,9 @@ scoreboard players remove @a rd_an_objective 3
 # The scoreboard helper supports the following operations
 scoreboard players add @a rd_an_objective 1
 scoreboard players remove @a rd_an_objective 1
+scoreboard players get @a rd_an_objective
 scoreboard players reset @a rd_an_objective
 scoreboard players enable @a rd_an_objective
-
-# providing just an objective and a selector translates to a "scoreboard players get" command
-# but still adhering to namespaceing rules.
-scoreboard players get @s rd_an_objective
 
 # providing just the objective resolves the objective name according to the namespacing rules
 execute if score @s rd_registry matches 1 run say hi

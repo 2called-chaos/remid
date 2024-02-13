@@ -31,6 +31,32 @@ execute as @e[tag=expensive_selector] at @s run <<<
 >>>
 
 
+# Function arguments are supported but will not be passed to anonymous sub functions.
+# This variation of anonymous functions keeps arguments but you need to define them
+# at least on the first level as REMID does not know how a function was invoked.
+# Nested functions will then inherit unless overwritten
+execute as @e[tag=expensive_selector] at @s run <<~
+	# we have the storage
+
+	execute run <<~
+		# we still have storage
+
+		execute run <<~
+			# now we have a different storage
+		~>> with storage different:storage
+	~>>
+
+	execute run <<<
+		# lost the storage reference
+
+		execute run <<~
+			# has outer ref again
+		~>>
+	>>>
+~>> with storage my:storage
+# It would have been nicer to define args when opening block but it's way harder to implement
+
+
 # Scheduling anonymous functions is not yet sugar-ified. You can do it like this but the scheduler won't know
 # that this function has been scheduled (when you use cancel_all, see frameworkish_stuff).
 # If you have an idea for a syntax for this let me know, I thought about ending with ">>> @ 10t" like

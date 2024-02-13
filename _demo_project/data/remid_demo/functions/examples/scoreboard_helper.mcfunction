@@ -22,15 +22,12 @@
 # The scoreboard helper supports the following operations
 > an_objective @a ++
 > an_objective @a --
+> an_objective @a get
 > an_objective @a reset
 > an_objective @a enable
 
-# providing just an objective and a selector translates to a "scoreboard players get" command
-# but still adhering to namespaceing rules.
-> an_objective @s
-
 # providing just the objective resolves the objective name according to the namespacing rules
-execute if score @s #{> registry} matches 1 run say hi
+execute if score #{> registry @s} matches 1 run say hi
 execute
 	as @s[scores={
 		#{>registry} = 1..2,

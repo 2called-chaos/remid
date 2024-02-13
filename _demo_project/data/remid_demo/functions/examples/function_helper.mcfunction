@@ -25,3 +25,35 @@ execute as @a run #{/foo/bar @<< 10s}
 
 # You can also clear a given schedule
 /foo/bar @ clear
+
+
+# This also works with relative paths
+/./function_in_this_folder
+/../function_in_parent_folder
+#{/../examples/../something/function}
+
+
+
+# Function arguments (1.20.2+) are supported UNLESS they include an @ (and maybe other symbols)
+# (note multiline and trailing comma support)
+/a_function {
+	"x" => 3,
+	"y" => 4,
+	"z" => 5,
+}
+# You still need to use macros correctly (in a_function:)
+#   $execute as @p run say $(x)
+
+
+
+# There is also a magic "::self" which references self (duh), including and intended for anonymous functions
+> registry foo = 10
+execute as @a run <<<
+	> registry foo --
+	summon cow
+
+	# iterate until foo is zero
+	execute
+		if score foo #{> registry} matches 1..
+		run #{/::self}
+>>>
