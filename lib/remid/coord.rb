@@ -118,7 +118,7 @@ module Remid
       Coord.new(x, y, z, relative: @relative, facing: @facing)
     end
 
-    def delta d_to
+    def delta d_to = nil
       diff(d_to).abs!
     end
 
