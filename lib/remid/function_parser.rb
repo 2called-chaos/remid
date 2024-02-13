@@ -654,9 +654,9 @@ module Remid
               in_interp = false
 
               if ibuf[0] == T_GT && ibuf[1] == T_BANG
-                sp = 1
+                sp = 2
                 sp += 1 while SPACES.include?(ibuf[sp])
-                r << resolve_scoreboard_instruct(ibuf[sp..-1])
+                r << resolve_scoreboard_op_instruct(ibuf[sp..-1])
               elsif ibuf[0] == T_GT
                 sp = 1
                 sp += 1 while SPACES.include?(ibuf[sp])
