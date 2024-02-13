@@ -143,6 +143,33 @@ module Remid
       "execute as #{target} at @s anchored eyes positioned ^ ^ ^ anchored feet run #{resolve_fcall ray_start}"
     end
 
+    def uuid_compare a, b, objective: :uuid_compare, out: "registry uuid_compare_matched"
+      a, af, am = a if a.is_a?(Array)
+      b, bf, bm = b if b.is_a?(Array)
+      af = "UUID" if af.nil?
+      bf = "UUID" if bf.nil?
+      work_objective = resolve_objective(objective)
+      out_o, out_p = out.split(" ", 2)
+
+      [].tap do |aout|
+        [a, b].each_with_index do |target, index|
+          aout << "#{"$" if (index == 0 ? am : bm)}execute store result score uuid_compare_#{index == 0 ? "a" : "b"}_0 #{work_objective} run data get entity #{target} #{index == 0 ? af : bf}[0]"
+          aout << "#{"$" if (index == 0 ? am : bm)}execute store result score uuid_compare_#{index == 0 ? "a" : "b"}_1 #{work_objective} run data get entity #{target} #{index == 0 ? af : bf}[1]"
+          aout << "#{"$" if (index == 0 ? am : bm)}execute store result score uuid_compare_#{index == 0 ? "a" : "b"}_2 #{work_objective} run data get entity #{target} #{index == 0 ? af : bf}[2]"
+          aout << "#{"$" if (index == 0 ? am : bm)}execute store result score uuid_compare_#{index == 0 ? "a" : "b"}_3 #{work_objective} run data get entity #{target} #{index == 0 ? af : bf}[3]"
+        end
+
+        aout << "scoreboard players set #{out_p} #{resolve_objective(out_o)} 0"
+        aout << ["execute"].tap {|line|
+          line << "if score uuid_compare_a_0 #{work_objective} = uuid_compare_b_0 #{work_objective}"
+          line << "if score uuid_compare_a_1 #{work_objective} = uuid_compare_b_1 #{work_objective}"
+          line << "if score uuid_compare_a_2 #{work_objective} = uuid_compare_b_2 #{work_objective}"
+          line << "if score uuid_compare_a_3 #{work_objective} = uuid_compare_b_3 #{work_objective}"
+          line << "run scoreboard players set #{out_p} #{resolve_objective(out_o)} 1"
+        }.join(" ")
+      end.join("\n")
+    end
+
     def j str = nil
       JsonHelper::PresentedMinecraftString.wrap(str || "")
     end
