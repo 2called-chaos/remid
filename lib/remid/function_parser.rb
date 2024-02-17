@@ -61,6 +61,7 @@ module Remid
     T_SLASH = "/".freeze
     T_BACKSLASH = "\\".freeze
     T_NSSEP = ":".freeze
+    T_PERCENT = "%".freeze
     T_AT = "@".freeze
 
     def initialize context, fname, payload, src, a_binding = nil, skip_indent: 0, li_offset: 0, anon_map: nil
@@ -170,9 +171,15 @@ module Remid
       end.join("\n")
     end
 
-    def j str = nil
+    def json_string str = nil, &block
       JsonHelper::PresentedMinecraftString.wrap(str || "")
     end
+    alias_method :j, :json_string
+
+    def json_eval code
+      JsonHelperProxy.call(code)
+    end
+    alias_method :e, :json_eval
 
     def save_player_inventory success:, failure: nil
       @context.__stub_invsave_functions
@@ -336,6 +343,8 @@ module Remid
           _l_scoreboard_helper
         elsif @line.readif(T_SLASH)
           _l_command_helper
+        elsif @line.readif(T_PERCENT)
+          _l_json_helper
         else
           _buf_iappend(@line.read)
 
@@ -619,6 +628,12 @@ module Remid
       _buf_iappend resolve_scoreboard_instruct(instruct)
     end
 
+    def _l_json_helper
+      @line.read_while(SPACES) # padding
+      instruct = process_interpolations(@line.read)
+      _buf_iappend json_eval(instruct).to_s
+    end
+
     def _l_command_helper
       fcall = process_interpolations(@line.read)
       _buf_iappend resolve_fcall(fcall)
@@ -654,14 +669,22 @@ module Remid
               in_interp = false
 
               if ibuf[0] == T_GT && ibuf[1] == T_BANG
+                # >!
                 sp = 2
                 sp += 1 while SPACES.include?(ibuf[sp])
                 r << resolve_scoreboard_op_instruct(ibuf[sp..-1])
               elsif ibuf[0] == T_GT
+                # >
                 sp = 1
                 sp += 1 while SPACES.include?(ibuf[sp])
                 r << resolve_scoreboard_instruct(ibuf[sp..-1])
+              elsif ibuf[0] == T_PERCENT
+                # %
+                sp = 1
+                sp += 1 while SPACES.include?(ibuf[sp])
+                r << json_eval(ibuf[sp..-1])
               elsif ibuf[0] == T_SLASH
+                # /
                 r << resolve_fcall(ibuf[1..-1])
               else
                 #puts Rainbow(ibuf).red

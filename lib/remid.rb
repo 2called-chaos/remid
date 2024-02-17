@@ -50,6 +50,7 @@ require "remid/sound"
 require "remid/team_manager"
 require "remid/team"
 require "remid/json_helper"
+require "remid/json_storage_context"
 
 require "remid/entity"
 require "remid/coord"

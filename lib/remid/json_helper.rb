@@ -235,7 +235,7 @@ module Remid
 
       def score objective, name = "*", resolve_objective: true
         if resolve_objective
-          raise "cannot resolve functions without remid context" unless Thread.current[:fparse_inst]
+          raise "cannot resolve objective without remid context" unless Thread.current[:fparse_inst]
           objective = Thread.current[:fparse_inst].resolve_objective(objective)
         end
         merged(score: { objective: objective, name: name }).notext!
@@ -244,6 +244,8 @@ module Remid
       def selector sel = "@s"
         merged(selector: sel).notext!
       end
+      alias_method :player, :selector
+      alias_method :entity, :selector
 
       def nbt path, **kw
         kw[:entity] = "@s" if ([:entity, :block, :storage] - kw.keys).length == 3
@@ -265,6 +267,13 @@ module Remid
       def wrap
         PresentedMinecraftStringBase.wrap(self)
       end
+    end
+  end
+
+  module JsonHelperProxy
+    using JsonHelper
+    def self.call code
+      eval(code)
     end
   end
 end
