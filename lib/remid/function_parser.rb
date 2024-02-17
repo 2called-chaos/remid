@@ -799,7 +799,28 @@ module Remid
 
       def resolve_scoreboard_op_instruct instruct
         instruct = instruct.strip
-        if m = instruct.match(/^([^\s]+)\s+([^\s]+)\s+(=|\+=|\-=|\*=|\/=|%=|><|<|>)\s+([^\s]+)$/i)
+        if m = instruct.match(/^(if|unless)\s+([^\s]+)\s+([^\s]+)\s+(==|=|!=|>|>=|<=|<)\s+([^\s]+)(?:\s+([^\s]+))?$/i)
+          i_cond = m[1] == "if"
+          i_obj1 = m[2]
+          i_trg1 = m[3]
+          i_op = m[4]
+
+          if m[6]
+            i_obj2 = m[5]
+            i_trg2 = m[6]
+          else
+            i_obj2 = m[2]
+            i_trg2 = m[5]
+          end
+
+          if i_op == "!="
+            i_op = "="
+            i_cond = !i_cond
+          end
+          i_op = "=" if i_op == "=="
+
+          "#{i_cond ? :if : :unless} score #{i_trg1} #{resolve_objective(i_obj1)} #{i_op} #{i_trg2} #{resolve_objective(i_obj2)}"
+        elsif m = instruct.match(/^([^\s]+)\s+([^\s]+)\s+(=|\+=|\-=|\*=|\/=|%=|><|<|>)\s+([^\s]+)$/i)
           "scoreboard players operation #{m[2]} #{resolve_objective(m[1])} #{m[3]} #{m[4]} #{resolve_objective(m[1])}"
         elsif m = instruct.match(/^([^\s]+)\s+([^\s]+)\s+(=|\+=|\-=|\*=|\/=|%=|><|<|>)\s+([^\s]+)\s+([^\s]+)$/i)
           "scoreboard players operation #{m[2]} #{resolve_objective(m[1])} #{m[3]} #{m[5]} #{resolve_objective(m[4])}"
