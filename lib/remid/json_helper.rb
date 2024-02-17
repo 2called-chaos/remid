@@ -86,11 +86,11 @@ module Remid
         r.flatten
       end
 
-      def to_s
+      def to_s inherit: false
         r = []
         # r << '{"text":""}' if @extras.any?
         r << @base.merge(text: "").to_json if @base
-        r << '""' if @extras.any? && r.empty?
+        r << '""' if @extras.any? && r.empty? && !inherit
         if (@opts.keys - [:merge_on_self]).empty?
           r << %{"#{@string.gsub("\n", "\\n")}"}
         else

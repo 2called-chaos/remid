@@ -8,8 +8,8 @@ module Remid
       @store = {}
     end
 
-    def store storage, name: "jsontext", &block
-      JsonStorageContext.new(storage, self, name: name, &block)
+    def store storage, *args, **kw, &block
+      JsonStorageContext.new(storage, self, *args, **kw, &block)
     end
 
     def build key, &block
