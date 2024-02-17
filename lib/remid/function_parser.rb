@@ -91,7 +91,7 @@ module Remid
       end
     end
 
-    def anonymous_function buf = nil, &block
+    def anonymous_function buf = nil, inlined: false, &block
       buf ||= []
       fkey = "#{@fname}".split("/".freeze)
       fkey.pop while fkey.last.start_with?("__anon".freeze)
@@ -101,16 +101,16 @@ module Remid
       if block
         if block.arity == 1
           block.call(buf)
-          xout = _execute_sub(buf, concat: false, as_func: true)
+          xout = _execute_sub(buf, concat: false, as_func: true, inlined: inlined)
           fnc = @context.__remid_register_anonymous_function(fkey, xout)
         else
           fnc = @context.__remid_register_unique_anonymous_function(fkey) do |_fnc|
             block.call(buf, _fnc)
-            _execute_sub(buf, concat: false, as_func: true, fname: _fnc)
+            _execute_sub(buf, concat: false, as_func: true, fname: _fnc, inlined: inlined)
           end
         end
       else
-        xout = _execute_sub(buf, concat: false, as_func: true)
+        xout = _execute_sub(buf, concat: false, as_func: true, inlined: inlined)
         fnc = @context.__remid_register_anonymous_function(fkey, xout)
       end
       "#{@context.function_namespace}:#{fnc}"
@@ -408,7 +408,7 @@ module Remid
       end
     end
 
-    def _execute_sub input_buffer, header: nil, footer: nil, concat: true, concat_warnings: nil, finalize: false, as_func: false, fname: nil, anon_map: nil
+    def _execute_sub input_buffer, header: nil, footer: nil, concat: true, concat_warnings: nil, finalize: false, as_func: false, fname: nil, anon_map: nil, inlined: false
       concat_warnings = concat if concat_warnings.nil?
       proc do
         a_binding = binding
@@ -428,6 +428,11 @@ module Remid
           (@a_binding.local_variables - a_binding.local_variables).each do |lv|
             a_binding.local_variable_set(lv, @a_binding.local_variable_get(lv))
           end
+        end
+
+        # overwrite indent if defined by Ruby out of indentation context
+        if inlined
+          a_binding.local_variable_set(:a_skip_indent, 0)
         end
 
         to_eval = []

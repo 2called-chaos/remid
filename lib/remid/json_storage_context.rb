@@ -41,40 +41,29 @@ module Remid
         raise "cannot concat json storages without function parser context"
       end
 
-      # $whatthefuckisgoingon = true
-      Thread.current[:fparse_inst].resolve_fcall Thread.current[:fparse_inst].anonymous_function{|aout|
-        aout << "execute as @s[tag=__remid.invsave.saved] run failure"
-        aout << "execute as @s[tag=!__remid.invsave.saved] run <<<"
-        aout << "\tsave"
-        aout << "\texecute as @s[tag=!__remid.invsave.saved] run <<<"
-        aout << "\t\tsave"
+      Thread.current[:fparse_inst].resolve_fcall Thread.current[:fparse_inst].anonymous_function(inlined: true){|aout|
+        aout << "\tdata modify storage #{src_storage} p_merge set value 0"
+        aout << "\texecute run <<<"
+        aout << "\t\texecute run <<<"
+        aout << "\t\t\texecute run <<<"
+        aout << "  $execute"
+        aout << "    if data storage #{src_storage} jsontext[$(p_merge)]"
+        aout << "    run <<~"
+        aout << "      $data modify storage #{@storage} jsontext append from storage #{src_storage} jsontext[$(p_merge)]"
+        aout << ""
+        aout << "      # increase pointer"
+        aout << "      execute store result score p_jsontext \#{> registry} run data get storage #{src_storage} p_merge"
+        aout << "      > registry p_jsontext ++"
+        aout << "      execute store result storage #{src_storage} p_merge int 1 run \#{> registry p_jsontext get}"
+        aout << "      > registry p_jsontext reset"
+        aout << ""
+        aout << "      # keep iterating"
+        aout << "      /::up with storage #{src_storage}"
+        aout << "    ~>>"
+        aout << "\t\t\t>>>"
+        aout << "\t\t>>>"
         aout << "\t>>>"
-        aout << ">>>"
       }
-      $whatthefuckisgoingon = false
-      # Thread.current[:fparse_inst].resolve_fcall Thread.current[:fparse_inst]._execute_sub([].tap{|aout|
-      #   aout << "\tdata modify storage #{src_storage} p_merge set value 0"
-      #   aout << "\texecute runa <<<"
-      #   aout << "\t\texecute runb <<<"
-      #   aout << "\t\t\texecute runc <<<"
-      #   # aout << "  $execute"
-      #   # aout << "    if data storage #{src_storage} jsontext[$(p_merge)]"
-      #   # aout << "    run xxx<<~"
-      #   # aout << "      $data modify storage #{@storage} jsontext append from storage #{src_storage} jsontext[$(p_merge)]"
-      #   # aout << ""
-      #   # aout << "      # increase pointer"
-      #   # aout << "      execute store result score p_jsontext \#{> registry} run data get storage #{src_storage} p_merge"
-      #   # aout << "      > registry p_jsontext ++"
-      #   # aout << "      execute store result storage #{src_storage} p_merge int 1 run \#{> registry p_jsontext get}"
-      #   # aout << "      > registry p_jsontext reset"
-      #   # aout << ""
-      #   # aout << "      # keep iterating"
-      #   # aout << "      /::up with storage #{src_storage}"
-      #   # aout << "    ~>>"
-      #   aout << "\t\t\t>>>"
-      #   aout << "\t\t>>>"
-      #   aout << "\t>>>"
-      # })
     end
   end
 end
