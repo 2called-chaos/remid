@@ -1,28 +1,40 @@
 module Remid
   class StringCollection
-    def initialize
+    attr_reader :context, :scope
+
+    def initialize context = nil, scope = []
+      @scope = scope
+      @context = context
       @store = {}
+    end
+
+    def store storage, name: "jsontext", &block
+      JsonStorageContext.new(storage, self, name: name, &block)
+    end
+
+    def build key, &block
+      if block.arity == 0
+        @store[key] = JsonHelper::PresentedMinecraftStringBase.wrap(block.call(*args, **kw))
+      else
+        out = JsonHelper::PresentedMinecraftStringBase.wrap("")
+        block.call(out, *args, **kw)
+        @store[key] = out
+      end
+    end
+
+    def inspect
+      "<#{self.class}::#{scope.join(":")}>"
     end
 
     def method_missing key, *args, **kw, &block
       if key.to_s.end_with?("=")
-        @store[key.to_s[1..-2].to_sym] = proc{ args.first }
+        @store[key.to_s[0..-2].to_sym] = proc{ args.first }
       elsif block
         @store[key] = block
       else
         case v = @store[key]
         when Proc
-          if v.arity == 0
-            JsonHelper::PresentedMinecraftStringBase.wrap(@store[key].call(*args, **kw))
-          else
-            out = JsonHelper::PresentedMinecraftStringBase.wrap("")
-            if kw.empty?
-              @store[key].call(out, *args)
-            else
-              @store[key].call(out, *args, **kw)
-            end
-            out
-          end
+          v.call(*args)
         when StringCollection, String
           v
         else
@@ -32,7 +44,7 @@ module Remid
     end
 
     def group key
-      @store[key] = StringCollection.new
+      @store[key] = StringCollection.new(@context, scope + [key])
       yield(@store[key]) if block_given?
       @store[key]
     end

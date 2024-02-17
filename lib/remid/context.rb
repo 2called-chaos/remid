@@ -1,7 +1,7 @@
 module Remid
   class Context
     COL = 10
-    attr_reader :opts, :sd, :scope, :vectors, :meta, :objectives, :scheduler, :advancements, :functions, :anonymous_functions, :blobs, :jsons, :parser, :on_load, :on_tick, :tag, :knows_world_spawn
+    attr_reader :opts, :sd, :scope, :vectors, :meta, :objectives, :scheduler, :advancements, :strings, :functions, :anonymous_functions, :blobs, :jsons, :parser, :on_load, :on_tick, :tag, :knows_world_spawn
     attr_accessor :function_dir, :function_namespace, :scoreboard_namespace, :relative_target, :teams
 
     def initialize sd, global_vars = nil, scope: :compile
@@ -25,6 +25,7 @@ module Remid
       @scheduler = FunctionScheduler.new(self)
       @objectives = ObjectiveManager.new(self)
       @advancements = AdvancementManager.new(self)
+      @strings = StringCollection.new(self)
       @teams = TeamManager.new(self)
       @tag = TagManager.new(self)
       @on_load = [:__remid_auto]
