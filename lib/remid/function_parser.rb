@@ -540,12 +540,12 @@ module Remid
         fargs = @line.read.presence || @anon_map&.dig(2)
       end
 
-      if a_buffer.join.include?("::self".freeze)
+      if a_buffer.join.include?("::self".freeze) || a_buffer.join.include?("::up".freeze)
         fnc = @context.__remid_register_unique_anonymous_function(fkey) do |_fnc|
-          _execute_sub(a_buffer, concat: false, as_func: true, fname: _fnc, anon_map: [@fname, _fnc, fargs])
+          _execute_sub(a_buffer, concat: false, as_func: true, fname: _fnc, anon_map: [(@anon_map&.dig(0) || [@fname]) + [_fnc], _fnc, fargs])
         end
       else
-        xout = _execute_sub(a_buffer, concat: false, as_func: true, anon_map: [@fname, fkey, fargs])
+        xout = _execute_sub(a_buffer, concat: false, as_func: true, anon_map: [(@anon_map&.dig(0) || [@fname]) + [fkey], fkey, fargs])
         fnc = @context.__remid_register_anonymous_function(fkey, xout)
       end
 
@@ -846,9 +846,16 @@ module Remid
         if fcall == "::self".freeze
           fcall = @fname
           is_self = true
+        elsif m = fcall.match(/^::up(?:\(([0-9]+)\))?/)
+          if @anon_map
+            fcall = @anon_map.dig(0, ((m[1] ? m[1] : 1).to_i + 1) * -1)
+          else
+            fcall = @fname
+          end
+          is_self = true
         elsif fcall == "::top".freeze
           if @anon_map
-            fcall = @anon_map[0]
+            fcall = @anon_map.dig(0, 0)
           else
             fcall = @fname
           end
